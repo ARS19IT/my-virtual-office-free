@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+*.bak
+*.bak2
+*.bak3
+.env
+.DS_Store
+.env.*
+!.env.example
+.venv/
+.runtime/
+.local-data/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.bak
+*.bak2
+*.bak3
+app/vo-config.json
+app/default-office-config.json.bak
+# Local screenshots and generated test artifacts
+free-office-live.png
+
