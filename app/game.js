@@ -8398,6 +8398,20 @@ function setGlobalState(state) {
 // --- Bubble Toggle & Manual Triggers ---
 let bubblesVisible = true;
 
+function updateBubbleToggleButton() {
+    const button = document.getElementById('btn-toggle-all');
+    if (!button) return;
+    const expanded = bubblesVisible;
+    button.textContent = expanded ? '💬 Свернуть' : '💬 Развернуть';
+    button.title = expanded ? 'Свернуть все облачка' : 'Развернуть все облачка';
+    button.setAttribute('aria-pressed', expanded ? 'false' : 'true');
+}
+
+function toggleAllBubbles() {
+    if (bubblesVisible) minimizeAllBubbles();
+    else expandAllBubbles();
+}
+
 function expandAllBubbles() {
     bubblesVisible = true;
     agents.forEach(a => {
@@ -8409,9 +8423,11 @@ function expandAllBubbles() {
     });
     addGlobalLog('💬 All bubbles expanded');
     expandAllChat();
+    updateBubbleToggleButton();
 }
 
 function minimizeAllBubbles() {
+    bubblesVisible = false;
     agents.forEach(a => {
         const ms = getBubbleMinState(a);
         ms.thought = true;
@@ -8419,6 +8435,7 @@ function minimizeAllBubbles() {
     });
     addGlobalLog('💬 All bubbles minimized');
     minimizeAllChat();
+    updateBubbleToggleButton();
 }
 
 function triggerBubble(type) {

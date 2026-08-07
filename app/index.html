@@ -192,8 +192,7 @@
                 <button id="btn-undo-edit" title="Отменить последнее изменение" onclick="undoEdit()" style="display:none;opacity:0.4" disabled>↩️ Отменить</button>
                 <button id="btn-agent-settings" title="Создать и настроить агентов" onclick="toggleAgentPanel()">👤 Агенты</button>
                 <div class="toolbar-divider"></div>
-                <button id="btn-expand-all" title="Развернуть все облачка" onclick="expandAllBubbles()">💬 Развернуть</button>
-                <button id="btn-minimize-all" title="Свернуть все облачка" onclick="minimizeAllBubbles()">💬 Свернуть</button>
+                <button id="btn-toggle-all" title="Свернуть все облачка" aria-pressed="false" onclick="toggleAllBubbles()">💬 Свернуть</button>
                 <a href="/models.html" style="text-decoration:none"><button title="Model & Provider Settings">⚙️ Models</button></a>
                 <a href="/cron.html" style="text-decoration:none"><button title="Cron Job Manager">⏰ Cron</button></a>
                 <button title="Project Manager" onclick="openProjectsManager()">📋 Projects</button>
