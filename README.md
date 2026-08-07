@@ -132,7 +132,7 @@ For Docker deployments, install Claude Code inside the container image or set `V
 ### Docker Compose (recommended)
 
 ```bash
-git clone https://github.com/eliautobot/my-virtual-office.git
+git clone https://github.com/Sena22555/my-virtual-office-free.git
 cd my-virtual-office
 docker compose up -d
 ```
@@ -142,7 +142,7 @@ Then open `http://localhost:8090/setup` to run the setup wizard.
 ### Docker Image / Platform Support
 
 The published Docker image is available at:
-- `ghcr.io/eliautobot/my-virtual-office:latest`
+- `ghcr.io/Sena22555/my-virtual-office-free:latest`
 
 Multi-arch images are published for:
 - `linux/amd64`
@@ -243,7 +243,7 @@ docker compose up -d
 Or pull the image directly:
 
 ```bash
-docker pull ghcr.io/eliautobot/my-virtual-office:latest
+docker pull ghcr.io/Sena22555/my-virtual-office-free:latest
 ```
 
 Your license key, office layout, and all settings persist across updates. They're stored in the `vo-data` volume.

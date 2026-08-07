@@ -43,8 +43,8 @@
                     <div class="main-menu-body">
                         <!-- Connection -->
                         <div class="mm-section">
-                            <div class="mm-section-title">🔌 OpenClaw Connection</div>
-                            <label class="mm-label">OpenClaw Path <span style="color:#666;font-size:9px">(server-side)</span></label>
+                            <div class="mm-section-title">🔌 Подключение к OpenClaw</div>
+                            <label class="mm-label">Путь к OpenClaw <span style="color:#666;font-size:9px">(server-side)</span></label>
                             <input type="text" id="mm-oc-path" class="mm-input" placeholder="/home/user/.openclaw">
                             <div style="font-size:9px;color:#666;margin:4px 0 8px;">Path to your OpenClaw installation on the server. Agents are discovered from this directory.</div>
                             <label class="mm-label">Gateway URL <span style="color:#666;font-size:9px">(server-side)</span></label>
@@ -53,21 +53,21 @@
                             <label class="mm-label">Gateway Token <span style="color:#666;font-size:9px">(auto-detected)</span></label>
                             <input type="text" id="mm-gateway-token" class="mm-input" placeholder="Auto-detected from openclaw.json" style="font-family:monospace;font-size:11px;">
                             <div style="font-size:9px;color:#666;margin:4px 0 8px;">Auth token for chat & live status. Auto-read from OpenClaw config. Override to connect to a different instance.</div>
-                            <button class="mm-btn mm-btn-primary" onclick="mmTestConnection()">🔍 Test Connection</button>
+                            <button class="mm-btn mm-btn-primary" onclick="mmTestConnection()">🔍 Проверить подключение</button>
                             <div id="mm-conn-status"></div>
                         </div>
                         <!-- Hermes Connection -->
                         <div class="mm-section">
-                            <div class="mm-section-title">⚕️ Hermes Connections</div>
+                            <div class="mm-section-title">⚕️ Подключения Hermes</div>
                             <label class="mm-label" style="display:flex;align-items:center;gap:6px;">
-                                <input type="checkbox" id="mm-hermes-enable" checked> Show native Hermes agents
+                                <input type="checkbox" id="mm-hermes-enable" checked> Показывать нативных агентов Hermes
                             </label>
                             <div style="font-size:9px;color:#666;margin:4px 0 8px;line-height:1.4;">
                                 Add one authenticated API connection per native Hermes profile. Hermes keeps ownership of its processes, tools, sessions, and terminal environment.
                             </div>
                             <div id="mm-hermes-fields" style="margin-top:8px;">
                                 <div id="mm-hermes-connections"></div>
-                                <button class="mm-btn" type="button" onclick="mmAddHermesConnection()">＋ Add Connection</button>
+                                <button class="mm-btn" type="button" onclick="mmAddHermesConnection()">＋ Добавить подключение</button>
                                 <label class="mm-label" style="display:flex;align-items:center;gap:6px;margin-top:8px;">
                                     <input type="checkbox" id="mm-hermes-platform-enable"> Hermes Messaging Gateway Platform
                                 </label>
@@ -83,9 +83,9 @@
                         <!-- Office Settings -->
                         <div class="mm-section">
                             <div class="mm-section-title">🏢 Office</div>
-                            <label class="mm-label">Office Name</label>
+                            <label class="mm-label">Название офиса</label>
                             <input type="text" id="mm-office-name" class="mm-input" placeholder="My Virtual Office">
-                            <label class="mm-label">Weather Location</label>
+                            <label class="mm-label">Местоположение для погоды</label>
                             <div style="display:flex;gap:8px">
                                 <input type="text" id="mm-weather-city" class="mm-input" placeholder="e.g. Miami" style="flex:2">
                                 <input type="text" id="mm-weather-state" class="mm-input" placeholder="e.g. FL" style="flex:1">
@@ -95,17 +95,17 @@
                         <div class="mm-section">
                             <div class="mm-section-title">🖥️ Display</div>
                             <label class="mm-label" style="display:flex;align-items:center;gap:6px;">
-                                <input type="checkbox" id="mm-show-bubbles" checked> Show chat bubbles
+                                <input type="checkbox" id="mm-show-bubbles" checked> Показывать облачка чата
                             </label>
                             <label class="mm-label" style="display:flex;align-items:center;gap:6px;">
-                                <input type="checkbox" id="mm-show-names" checked> Show agent names
+                                <input type="checkbox" id="mm-show-names" checked> Показывать имена агентов
                             </label>
                         </div>
-                        <!-- API Usage -->
+                        <!-- Использование API -->
                         <div class="mm-section">
-                            <div class="mm-section-title">☁️ API Usage</div>
+                            <div class="mm-section-title">☁️ Использование API</div>
                             <label class="mm-label" style="display:flex;align-items:center;gap:6px;">
-                                <input type="checkbox" id="mm-apiusage-enable" checked> Show API Usage Panel
+                                <input type="checkbox" id="mm-apiusage-enable" checked> Show Использование API Panel
                             </label>
                             <div style="font-size:9px;color:#666;margin:4px 0 8px;">
                                 Auto-detects providers from your OpenClaw config (Anthropic, OpenAI, Google, etc.).<br>
@@ -113,29 +113,29 @@
                             </div>
                             <div id="mm-apiusage-status"></div>
                         </div>
-                        <!-- PC Performance -->
+                        <!-- Производительность ПК -->
                         <div class="mm-section">
-                            <div class="mm-section-title">🖥️ PC Performance</div>
+                            <div class="mm-section-title">🖥️ Производительность ПК</div>
                             <label class="mm-label" style="display:flex;align-items:center;gap:6px;">
-                                <input type="checkbox" id="mm-pcmetrics-enable"> Enable PC Performance Monitor
+                                <input type="checkbox" id="mm-pcmetrics-enable"> Enable Производительность ПК Monitor
                             </label>
                             <div id="mm-pcmetrics-fields" style="display:none;margin-top:8px;">
                                 <label class="mm-label">Metrics Server URL</label>
                                 <input type="text" id="mm-pcmetrics-url" class="mm-input" placeholder="http://192.168.1.100:8099">
                                 <div style="font-size:9px;color:#666;margin:4px 0 8px;">URL of the PC running pc-metrics-server.py. Can be local or remote.</div>
-                                <button class="mm-btn mm-btn-primary" onclick="mmTestPcMetrics()">🔍 Test Connection</button>
+                                <button class="mm-btn mm-btn-primary" onclick="mmTestPcMetrics()">🔍 Проверить подключение</button>
                                 <div id="mm-pcmetrics-status"></div>
                             </div>
                         </div>
                         <div class="mm-section">
-                            <div class="mm-section-title">&#x1F310; Agent Browser</div>
+                            <div class="mm-section-title">&#x1F310; Браузер агента</div>
                             <div style="font-size:11px;color:#888;margin-bottom:8px;line-height:1.4;">
                                 Give your AI agents a real web browser they can control. You can watch them browse in real time through a live viewer panel.<br><br>
                                 <b>How it works:</b> Your agents use <b>CDP</b> (Chrome DevTools Protocol) to navigate, click, and read pages. The <b>Viewer</b> is a live screen you see in the office — like watching over their shoulder.<br><br>
                                 <b>Compatible with:</b> KasmVNC, headless Chromium, browserless.io, Playwright, or any setup that exposes CDP. The viewer can be any VNC/noVNC/web viewer.
                             </div>
                             <label class="mm-label" style="display:flex;align-items:center;gap:6px;">
-                                <input type="checkbox" id="mm-browser-enable"> Enable Agent Browser
+                                <input type="checkbox" id="mm-browser-enable"> Enable Браузер агента
                             </label>
                             <div id="mm-browser-fields" style="display:none;margin-top:8px;">
                                 <label class="mm-label">CDP URL <span style="color:#666;font-size:9px">(how agents control the browser)</span></label>
@@ -160,10 +160,10 @@
                         <!-- Actions -->
                         <div class="mm-section">
                             <div class="mm-section-title">⚡ Actions</div>
-                            <button class="mm-btn" onclick="mmExportConfig()">📤 Export Office Config</button>
-                            <button class="mm-btn" onclick="mmImportConfig()">📥 Import Office Config</button>
+                            <button class="mm-btn" onclick="mmExportConfig()">📤 Экспорт конфигурации офиса</button>
+                            <button class="mm-btn" onclick="mmImportConfig()">📥 Импорт конфигурации офиса</button>
                             <input type="file" id="mm-import-file" accept=".json" style="display:none">
-                            <button class="mm-btn mm-btn-danger" onclick="mmFullReset()">🗑️ Full Reset</button>
+                            <button class="mm-btn mm-btn-danger" onclick="mmFullReset()">🗑️ Полный сброс</button>
                             <div class="mm-warning">Resets all furniture, agents, and branches to defaults.</div>
                         </div>
                         <!-- Help -->
@@ -178,10 +178,10 @@
                                 <p><b>Move group:</b> After multi-selecting, click+hold any selected item to drag them all together.</p>
                                 <p><b>Shortcuts:</b> Del = delete selected, Esc = cancel, click empty = deselect all</p>
                             </div>
-                            <a href="/setup" class="mm-btn" style="text-align:center;display:block;text-decoration:none">🧙 Run Setup Wizard</a>
+                            <a href="/setup" class="mm-btn" style="text-align:center;display:block;text-decoration:none">🧙 Запустить мастер настройки</a>
                         </div>
                         <!-- Save -->
-                        <button class="mm-btn mm-btn-primary mm-save-all" onclick="mmSaveSettings()">💾 Save Settings</button>
+                        <button class="mm-btn mm-btn-primary mm-save-all" onclick="mmSaveSettings()">💾 Сохранить настройки</button>
                     </div>
                 </div>
             </div>
@@ -199,7 +199,7 @@
                 <button title="Project Manager" onclick="openProjectsManager()">📋 Projects</button>
                 <button title="Reset canvas zoom" onclick="resetCamera()">🔍 Reset</button>
                 <button id="sms-toggle" title="SMS/Phone Panel">📞 SMS</button>
-                <button id="browser-toggle" title="Agent Browser (Neko)" class="browser-toggle-btn">🌐 Browser</button>
+                <button id="browser-toggle" title="Браузер агента (Neko)" class="browser-toggle-btn">🌐 Browser</button>
             </div>
         </div>
         <div class="sidebar-edge" id="sidebar-edge" onclick="toggleSidebar()" title="Toggle sidebar">
@@ -208,7 +208,7 @@
         <div class="sidebar" id="sidebar">
             <div class="brand">
                 <h2 id="brand-title">VIRTUAL</h2>
-                <h3>⚡ DASHBOARD ⚡</h3>
+                <h3>⚡ ПАНЕЛЬ УПРАВЛЕНИЯ ⚡</h3>
             </div>
             <script>
             // Load office name from config
@@ -267,17 +267,17 @@
             </div>
 
             <div class="branch-manager-panel collapsible">
-                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 🏢 BRANCHES</h4>
+                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 🏢 ВЕТКИ</h4>
                 <div class="section-body" style="display:none">
                     <div class="branch-manager-actions">
-                        <button onclick="branchCreatePrompt()">➕ Add Branch</button>
+                        <button onclick="branchCreatePrompt()">➕ Добавить ветку</button>
                     </div>
                     <div id="branch-sections-container"></div>
                 </div>
             </div>
 
             <div class="projects-leaderboard collapsible">
-                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 🏆 LEADERBOARD</h4>
+                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 🏆 ТАБЛИЦА ЛИДЕРОВ</h4>
                 <div class="section-body" style="display:none">
                     <div id="sidebar-projects-lb" class="proj-leaderboard">
                         <div class="proj-lb-empty">No scores yet — complete tasks to earn XP!</div>
@@ -286,10 +286,10 @@
             </div>
 
             <div class="meetings-sidebar collapsible">
-                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 📊 MEETINGS</h4>
+                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 📊 ВСТРЕЧИ</h4>
                 <div class="section-body" style="display:none">
                     <div id="sidebar-mtg-active" class="sidebar-mtg-list"></div>
-                    <button class="sidebar-mtg-btn" onclick="openMeetingsDashboard()">📊 Встречи</button>
+                    <button class="sidebar-mtg-btn" onclick="openВстречиDashboard()">📊 Встречи</button>
                 </div>
             </div>
 
@@ -302,21 +302,21 @@
             </div>
 
             <div class="skills-library-sidebar collapsible">
-                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 📚 SKILLS LIBRARY</h4>
+                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> 📚 БИБЛИОТЕКА НАВЫКОВ</h4>
                 <div class="section-body" style="display:none">
                     <button class="sidebar-mtg-btn" onclick="openSkillsLibrary()">📚 Библиотека навыков</button>
                 </div>
             </div>
 
             <div class="status-panel">
-                <p>🔴 Working: <span id="count-working">0</span></p>
-                <p>🟢 Idle: <span id="count-idle">0</span></p>
-                <p>🔵 Meeting: <span id="count-meeting">0</span></p>
-                <p>☕ Break: <span id="count-break">0</span></p>
+                <p>🔴 Работают: <span id="count-working">0</span></p>
+                <p>🟢 Свободны: <span id="count-idle">0</span></p>
+                <p>🔵 На встрече: <span id="count-meeting">0</span></p>
+                <p>☕ На перерыве: <span id="count-break">0</span></p>
             </div>
 
             <div class="activity-feed collapsible">
-                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> > ACTIVITY LOG</h4>
+                <h4 onclick="toggleSection(this)"><span class="section-arrow">▶</span> > ЖУРНАЛ АКТИВНОСТИ</h4>
                 <div class="section-body" style="display:none">
                     <ul id="log-list">
                         <li>System initialized...</li>
@@ -337,14 +337,14 @@
             <p id="modal-role" class="modal-role"></p>
             <div class="modal-grid">
                 <div class="modal-section">
-                    <h3>STATUS</h3>
+                    <h3>СТАТУС</h3>
                     <p id="modal-status">Online</p>
-                    <p>Task: <span id="modal-task">—</span></p>
+                    <p>Задача: <span id="modal-task">—</span></p>
                 </div>
                 <div class="modal-section">
-                    <h3>BRANCH</h3>
+                    <h3>ВЕТКА</h3>
                     <p id="modal-branch">—</p>
-                    <p>Updated: <span id="modal-updated">—</span></p>
+                    <p>Обновлено: <span id="modal-updated">—</span></p>
                 </div>
                 <div class="modal-section full-width">
                     <h3>⚡ MODEL</h3>
@@ -355,11 +355,11 @@
                     <p id="modal-model-status" class="model-status-msg"></p>
                 </div>
                 <div class="modal-section full-width io-section">
-                    <h3>📥 LAST REQUEST</h3>
+                    <h3>📥 ПОСЛЕДНИЙ ЗАПРОС</h3>
                     <div id="modal-input" class="scroll-box io-box"></div>
                 </div>
                 <div class="modal-section full-width io-section">
-                    <h3>📤 RESPONSE</h3>
+                    <h3>📤 ОТВЕТ</h3>
                     <div id="modal-output" class="scroll-box io-box"></div>
                 </div>
             <div class="modal-section full-width bio-section">
@@ -483,32 +483,32 @@
         </div>
     </div>
 
-    <!-- Meetings Dashboard Modal -->
+    <!-- Встречи Dashboard Modal -->
     <div id="meetingsModal" class="modal hidden">
         <div class="modal-content meetings-modal-content">
             <div class="modal-header">
                 <span class="modal-emoji">📊</span>
-                <h2>Meetings</h2>
-                <span class="close-btn" onclick="closeMeetingsModal()">&times;</span>
+                <h2>Встречи</h2>
+                <span class="close-btn" onclick="closeВстречиModal()">&times;</span>
             </div>
             <div class="mtg-tabs">
-                <button class="mtg-tab active" data-tab="active" onclick="switchMtgTab('active')">Active</button>
-                <button class="mtg-tab" data-tab="completed" onclick="switchMtgTab('completed')">History</button>
+                <button class="mtg-tab active" data-tab="active" onclick="switchMtgTab('active')">Активные</button>
+                <button class="mtg-tab" data-tab="completed" onclick="switchMtgTab('completed')">История</button>
             </div>
             <div class="mtg-bulk-actions">
                 <button class="mtg-btn" onclick="mtgExpandAll()">▼ Развернуть всё</button>
-                <button class="mtg-btn" onclick="mtgCollapseAll()">▲ Collapse All</button>
+                <button class="mtg-btn" onclick="mtgCollapseAll()">▲ Свернуть всё</button>
             </div>
             <div id="mtg-cards" class="mtg-cards"></div>
         </div>
     </div>
 
-    <!-- Skills Library Modal -->
+    <!-- Библиотека навыков Modal -->
     <div id="skillsLibraryModal" class="modal hidden">
         <div class="modal-content skills-library-modal">
             <div class="modal-header">
                 <span class="modal-emoji">📚</span>
-                <h2>Skills Library</h2>
+                <h2>Библиотека навыков</h2>
                 <span class="close-btn" onclick="closeSkillsLibrary()">&times;</span>
             </div>
             <div class="skl-topbar">
@@ -563,25 +563,25 @@
         </div>
     </div>
 
-    <!-- End Meeting Sub-Modal -->
+    <!-- Завершить встречу Sub-Modal -->
     <div id="endMeetingModal" class="modal hidden">
         <div class="modal-content" style="max-width:480px;">
             <div class="modal-header">
                 <span class="modal-emoji">✅</span>
-                <h2>End Meeting</h2>
+                <h2>Завершить встречу</h2>
                 <span class="close-btn" onclick="closeEndMeetingModal()">&times;</span>
             </div>
             <input type="hidden" id="end-mtg-id">
             <div class="mtg-form">
-                <label class="mtg-label">Summary <span style="color:#e74c3c">*</span></label>
+                <label class="mtg-label">Итоги <span style="color:#e74c3c">*</span></label>
                 <textarea id="end-mtg-summary" class="mtg-textarea" rows="3" placeholder="What happened in this meeting?"></textarea>
-                <label class="mtg-label">Resolution</label>
+                <label class="mtg-label">Решение</label>
                 <textarea id="end-mtg-resolution" class="mtg-textarea" rows="2" placeholder="Outcome / decisions made (optional)"></textarea>
-                <label class="mtg-label">Action Items <span style="color:#666;font-size:9px">(one per line)</span></label>
+                <label class="mtg-label">Задачи по итогам <span style="color:#666;font-size:9px">(one per line)</span></label>
                 <textarea id="end-mtg-actions" class="mtg-textarea" rows="3" placeholder="e.g. Cody: implement auth module&#10;Usy: update login UI"></textarea>
                 <div id="end-mtg-responses-section"></div>
                 <div id="end-mtg-error" style="color:#e74c3c;font-size:10px;margin:6px 0;display:none;"></div>
-                <button class="mtg-btn mtg-btn-end" onclick="submitEndMeeting()">End Meeting</button>
+                <button class="mtg-btn mtg-btn-end" onclick="submitEndMeeting()">Завершить встречу</button>
             </div>
         </div>
     </div>
@@ -597,7 +597,7 @@
         <div class="sms-resize-handle bottom-left"></div>
         <div class="sms-resize-handle left"></div>
         <div class="sms-header">
-            <span>📞 SMS Inbox</span>
+            <span>📞 Входящие SMS</span>
             <span id="sms-count" class="sms-count">0</span>
             <span style="flex:1"></span>
             <div class="sms-header-btns">
@@ -623,7 +623,7 @@
                 <div class="sms-thread-header">
                     <button id="sms-back-to-inbox" class="sms-back-to-inbox" type="button">← Inbox</button>
                     <div class="sms-thread-header-main">
-                        <div id="sms-thread-title" class="sms-thread-title">Select a contact</div>
+                        <div id="sms-thread-title" class="sms-thread-title">Выберите контакт</div>
                         <div id="sms-thread-subtitle" class="sms-thread-subtitle">Choose a thread to view the conversation.</div>
                     </div>
                     <div class="sms-mode-toggle">
@@ -634,7 +634,7 @@
                         </label>
                     </div>
                 </div>
-                <div id="sms-empty-state" class="sms-empty-state">Select a contact thread on the left, or open a number to start a new one.</div>
+                <div id="sms-empty-state" class="sms-empty-state">Выберите контакт thread on the left, or open a number to start a new one.</div>
                 <div id="sms-messages" class="sms-messages"></div>
                 <div class="sms-input-row sms-compose-row">
                     <textarea id="sms-input" class="sms-input" placeholder="Switch this thread to User to reply manually..." rows="2"></textarea>
@@ -748,11 +748,11 @@
         <div class="browser-resize-handle bottom-left" data-resize="sw"></div>
         <div class="browser-resize-handle bottom-right" data-resize="se"></div>
         <div class="browser-header" id="browser-drag-handle">
-            <span class="browser-title">🌐 Agent Browser</span>
+            <span class="browser-title">🌐 Браузер агента</span>
             <span id="browser-status" class="browser-status">Idle</span>
             <div class="browser-controls">
-                <button id="browser-take-control" class="browser-ctrl-btn" title="Take manual control">🖱️ Take Control</button>
-                <button id="browser-release" class="browser-ctrl-btn browser-release-btn" title="Release control back to AI" style="display:none">🤖 Release to AI</button>
+                <button id="browser-take-control" class="browser-ctrl-btn" title="Take manual control">🖱️ Взять управление</button>
+                <button id="browser-release" class="browser-ctrl-btn browser-release-btn" title="Release control back to AI" style="display:none">🤖 Передать управление ИИ</button>
                 <div class="browser-snap-group">
                     <button class="browser-snap-btn" data-zone="4" title="Snap top-left">4</button>
                     <button class="browser-snap-btn" data-zone="3" title="Snap top-right">3</button>
@@ -774,7 +774,7 @@
 
     <!-- Agent Workspace Window -->
     <div id="agent-workspace-menu" class="agent-workspace-menu hidden">
-        <button id="agent-workspace-open-btn" type="button">Open agent workspace</button>
+        <button id="agent-workspace-open-btn" type="button">Открыть рабочее пространство агента</button>
     </div>
     <div id="agent-workspace-panel" class="agent-workspace-panel hidden">
         <div class="agent-workspace-resize-handle" data-resize="se"></div>
@@ -793,8 +793,8 @@
             </div>
         </div>
         <div class="agent-workspace-tabs">
-            <button class="active" data-aw-tab="overview" type="button">Overview</button>
-            <button data-aw-tab="bulletin" type="button">Bulletin</button>
+            <button class="active" data-aw-tab="overview" type="button">Обзор</button>
+            <button data-aw-tab="bulletin" type="button">Бюллетень</button>
             <button data-aw-tab="tasks" type="button">Tasks</button>
             <button data-aw-tab="files" type="button">Files</button>
             <button data-aw-tab="skills" type="button">Skills</button>

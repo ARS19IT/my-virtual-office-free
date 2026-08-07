@@ -30,6 +30,7 @@ import sqlite3
 import subprocess
 import time
 import gateway_presence
+import browser_control
 from layout_library import LayoutLibrary, LayoutValidationError
 from zoneinfo import ZoneInfo
 try:
@@ -342,6 +343,8 @@ def _load_vo_config():
         "browser": {
             "cdpUrl": _env_or("VO_CDP_URL", browser_cfg.get("cdpUrl")),
             "viewerUrl": _env_or("VO_VIEWER_URL", browser_cfg.get("viewerUrl")),
+            # Agents receive only this broker token; CDP credentials stay server-side.
+            "actionToken": _env_or("VO_BROWSER_TOKEN", browser_cfg.get("actionToken", "")),
         },
         "weather": {
             "location": _env_or("VO_WEATHER_LOCATION", weather_cfg.get("location")),
@@ -2870,14 +2873,31 @@ def _vo_browser_skill_content():
     office_url = f"http://127.0.0.1:{PORT}"
     return '''---
 name: VirtualOffice-Browser-Control
-description: "Use the Virtual Office browser panel/status surface safely instead of direct Kasm/CDP credentials."
+description: "Use the shared provider-neutral Virtual Office browser broker without raw CDP credentials."
 ---
 
 # VirtualOffice Browser Control
 
 Use this when you need the shared Virtual Office browser/Kasm panel.
 
-## Current safe read endpoints
+## Broker endpoint
+
+Set `VO_BROWSER_TOKEN` on the office server and give agents the token through
+their normal secret store (never put it in a skill file or prompt). The server
+keeps `VO_CDP_URL` private. Every action is serialized so agents cannot race
+the shared browser.
+
+```bash
+curl -sS -X POST {office_url}/api/browser/action \\
+  -H 'Authorization: Bearer $VO_BROWSER_TOKEN' \\
+  -H 'Content-Type: application/json' \\
+  -d '{{"action":"status"}}'
+```
+
+Supported actions: `status`, `tabs`, `navigate` (`url`), `click` (`selector`),
+`type`/`input` (`selector`, `text` or `value`), and `screenshot`.
+
+## Safe read endpoints (legacy/UI)
 
 ```bash
 curl -sS {office_url}/browser-status
@@ -2892,9 +2912,14 @@ curl -sS {office_url}/browser-controller
 - Announce/request browser use through presence or AgentPlatform communications so the office owner can see who is using it.
 - If another agent/user controls the browser, wait or ask instead of fighting for control.
 
-## Current limitation
+## Rules and free gate
 
-This skill documents the shared browser surface. A provider-neutral browser action endpoint is planned next; until then, agents outside OpenClaw should not bypass the office to control Kasm directly.
+- All OpenClaw, Hermes, Codex, and Claude Code agents use this same endpoint.
+- Never expose or request raw CDP/WebSocket credentials.
+- The browser panel remains subject to the normal free/demo license gate. If the
+  gate is off, the broker returns 403; do not bypass it.
+- Announce browser work via presence/office communications and wait if another
+  agent owns the shared browser.
 '''.replace("{office_url}", office_url)
 
 
@@ -9703,6 +9728,7 @@ def _handle_task_create(project_id, body):
         "priority": body.get("priority", "medium"),
         "assignee": assignee,
         "assigneeBranch": body.get("assigneeBranch"),
+        "parentTaskId": body.get("parentTaskId"),
         "dueDate": body.get("dueDate"),
         "tags": body.get("tags", []),
         "checklist": body.get("checklist", []),
@@ -9711,6 +9737,11 @@ def _handle_task_create(project_id, body):
         "createdAt": now,
         "updatedAt": now,
         "completedAt": None,
+        # Durable orchestration linkage, populated on actual dispatch.
+        "workflowStatus": "backlog",
+        "workerRunId": None,
+        "workerSessionKey": None,
+        "childRunLinks": [],
     }
     p["tasks"].append(task)
     p["updatedAt"] = now
@@ -10388,6 +10419,7 @@ def _wf_extract_session_activity(agent_id, project_id, task_id):
         "exec_commands": [],
         "browser_actions": [],
         "tool_call_count": 0,
+        "spawn_calls": [],
     }
 
     try:
@@ -10452,6 +10484,15 @@ def _wf_extract_session_activity(agent_id, project_id, task_id):
                             if browser_desc and browser_desc not in seen_browser_actions:
                                 seen_browser_actions.add(browser_desc)
                                 activity["browser_actions"].append(browser_desc)
+                    elif name.lower() == "sessions_spawn":
+                        if isinstance(args, dict):
+                            activity["spawn_calls"].append({
+                                "agentId": args.get("agentId") or args.get("agent_id"),
+                                "task_id": args.get("task_id") or args.get("taskId"),
+                                "parentTaskId": args.get("parentTaskId") or args.get("parent_task_id"),
+                                "runId": args.get("runId") or args.get("run_id"),
+                                "sessionKey": args.get("sessionKey") or args.get("session_key"),
+                            })
                     elif name.lower() == "browser":
                         action = args.get("action", "")
                         url = args.get("url", "")
@@ -10801,6 +10842,62 @@ def _wf_call_agent(agent_id, message, timeout=600, project_id=None, task_id=None
     return _wf_call_agent_cli(agent_id, message, timeout, session_key=session_key)
 
 
+def _wf_supervisor_spawn_children(project_id, parent_task, child_tasks):
+    """Ask the configured supervisor to spawn children through Gateway tools.
+
+    Workers are deliberately not trusted to launch orchestration.  The request
+    goes to the supervisor's normal Gateway-routed session, where
+    ``sessions_spawn`` is an actual allowed tool.  No CLI, raw websocket, or
+    session-file shortcut is used here.  The supervisor must return one JSON
+    object per child so the workflow can persist the opaque run/session links.
+    """
+    if not child_tasks:
+        return []
+    child_lines = "\n".join(
+        f'- task text: task_id={child.get("id")}; parentTaskId={parent_task.get("id")}; '
+        f'agent={child.get("assignee")}; title={child.get("title")}'
+        for child in child_tasks
+    )
+    prompt = f"""You are the workflow supervisor. Use the OpenClaw sessions_spawn TOOL for every child below.
+Never use exec, a CLI, or direct Gateway/session APIs to emulate spawning.
+The worker may have split the parent task, but only you may launch children.
+Parent task id: {parent_task.get('id')}
+Project id: {project_id}
+Children:
+{child_lines}
+
+Do not add task_id or parentTaskId as sessions_spawn arguments: they are not
+accepted by that tool schema. Put the IDs from each task text into the spawned
+child's task/message text, and use the child's assignee as the tool's agentId.
+After all calls, return ONLY JSON using the known IDs and the actual values from
+each tool result: {{\"children\":[{{\"task_id\":\"known child id\",\"parentTaskId\":\"known parent id\",\"agentId\":\"...\",\"runId\":\"actual tool result runId\",\"sessionKey\":\"actual tool result sessionKey\"}}]}}.
+Do not claim a child was spawned unless the tool returned its runId and sessionKey."""
+    response = _wf_call_agent("main", prompt, timeout=120)
+    try:
+        payload = json.loads(response or "")
+        links = payload.get("children", []) if isinstance(payload, dict) else []
+    except (TypeError, json.JSONDecodeError):
+        links = []
+    if not isinstance(links, list):
+        return []
+    expected = {child.get("id") for child in child_tasks}
+    valid = []
+    for link in links:
+        if not isinstance(link, dict):
+            continue
+        if (link.get("task_id") in expected and
+                link.get("parentTaskId") == parent_task.get("id") and
+                link.get("agentId") and link.get("runId") and link.get("sessionKey")):
+            valid.append({
+                "task_id": link["task_id"],
+                "parentTaskId": link["parentTaskId"],
+                "agentId": link["agentId"],
+                "runId": link["runId"],
+                "sessionKey": link["sessionKey"],
+            })
+    return valid
+
+
 def _extract_openclaw_text(value):
     """Normalize OpenClaw message/content shapes into plain text."""
     if value is None:
@@ -11059,6 +11156,17 @@ def _wf_build_task_prompt(task, task_file_content=None, project=None):
             status = "✅ DONE" if item.get("done") else "⬜ TODO"
             checklist_text += f"  {i}. [{status}] {item.get('text', '')}\n"
 
+    child_tasks = []
+    if project:
+        child_tasks = [candidate for candidate in project.get("tasks", [])
+                       if candidate.get("parentTaskId") == task.get("id") and not candidate.get("completedAt")]
+    child_text = ""
+    if child_tasks:
+        child_text = "\n\nCHILD TASKS — accept and track these assignments, but do not launch them yourself:\n"
+        for child in child_tasks:
+            child_text += f"- task_id={child.get('id')} agent={child.get('assignee')} title={child.get('title')}\n"
+        child_text += "The supervisor/main process is solely responsible for launching these children through the OpenClaw sessions_spawn tool. Report each child as ready, completed, or blocked with evidence."
+
     previous_work = ""
     if task_file_content:
         previous_work = f"\n\n--- PREVIOUS WORK LOG ---\n{task_file_content}\n--- END PREVIOUS WORK LOG ---\n\nContinue from where you left off. Do NOT redo work that was already completed."
@@ -11069,7 +11177,7 @@ def _wf_build_task_prompt(task, task_file_content=None, project=None):
 
 DESCRIPTION:
 {task.get('description', 'No description provided.')}
-{checklist_text}
+{checklist_text}{child_text}
 {previous_work}
 
 MANDATORY RULES — VIOLATIONS WILL FAIL REVIEW:
@@ -11394,10 +11502,11 @@ def _wf_run_pipeline_inner(project_id, single_task, wf, stop_flag):
         if not project:
             break
 
-        # Check for an active task (in-progress or review) before pulling from backlog.
-        # This prevents backlog tasks from jumping ahead of tasks sent back for rework.
+        # Check for an active task before pulling from backlog. An explicit dispatch
+        # is allowed to resume its own pinned task, but never another task.
+        target_task_id = wf.get("targetTaskId")
         active_task = _wf_get_active_task(project)
-        if active_task:
+        if active_task and active_task.get("id") != target_task_id:
             # There's already a task being worked on — do NOT pull from backlog.
             # The pipeline should not start a new task while one is still active.
             with _WORKFLOW_LOCK:
@@ -11409,8 +11518,20 @@ def _wf_run_pipeline_inner(project_id, single_task, wf, stop_flag):
             _wf_persist_state(project_id)
             break
 
-        # Find next backlog task
-        task = _wf_next_backlog_task(project)
+        # Find the explicitly requested task, or (only for legacy workflow start)
+        # the next backlog task. Dispatch never scans for work implicitly.
+        task = None
+        if target_task_id:
+            task = next((candidate for candidate in project.get("tasks", [])
+                         if candidate.get("id") == target_task_id and not candidate.get("completedAt")), None)
+            if not task:
+                with _WORKFLOW_LOCK:
+                    wf["phase"] = "error"
+                    wf["error"] = "Explicit task not found or already completed"
+                    wf["active"] = False
+                break
+        else:
+            task = _wf_next_backlog_task(project)
         if not task:
             # No more backlog tasks
             with _WORKFLOW_LOCK:
@@ -11449,8 +11570,21 @@ def _wf_run_pipeline_inner(project_id, single_task, wf, stop_flag):
                 wf["active"] = False
             break
 
+        # Persist the actual worker session linkage before invoking it. This
+        # makes the parent/worker relationship observable even while the call is
+        # in flight and lets clients distinguish queued from running work.
+        data = _load_projects()
+        linked_project = next((candidate for candidate in data.get("projects", []) if candidate.get("id") == project_id), None)
+        linked_task = next((candidate for candidate in (linked_project or {}).get("tasks", []) if candidate.get("id") == task_id), None)
+        if linked_task is not None:
+            linked_task["workflowStatus"] = "running"
+            linked_task["workerSessionKey"] = _wf_task_session_key(assignee, project_id, task_id)
+            linked_task["workerRunId"] = None
+            linked_task["childRunLinks"] = []
+            linked_project["updatedAt"] = _proj_now()
+            _save_projects(data)
         _wf_move_task(project_id, task_id, inprogress_col["id"], by="workflow")
-        _wf_write_task_file(project_id, task, "in_progress", work_log_entry="Sent to agent for work")
+        _wf_write_task_file(project_id, task, "in_progress", work_log_entry="Sent to worker for work")
 
         with _WORKFLOW_LOCK:
             wf["phase"] = "in_progress"
@@ -11473,6 +11607,29 @@ def _wf_run_pipeline_inner(project_id, single_task, wf, stop_flag):
 
         # Update task file with agent response + file activity
         work_activity = _wf_extract_session_activity(assignee, project_id, task_id)
+        child_tasks = [candidate for candidate in project.get("tasks", []) if candidate.get("parentTaskId") == task_id and not candidate.get("completedAt")]
+        # Workers may split/prepare child assignments, but only the supervisor
+        # is allowed to launch them through the Gateway-backed sessions_spawn
+        # tool.  Never treat worker transcript claims as spawn evidence.
+        valid_spawns = _wf_supervisor_spawn_children(project_id, task, child_tasks)
+        if child_tasks and len(valid_spawns) < len(child_tasks):
+            # A parent with declared children cannot silently pass without
+            # supervisor-issued Gateway spawn evidence for every child.
+            _wf_update_task_field(project_id, task_id, "workflowStatus", "blocked")
+            _wf_update_task_field(project_id, task_id, "childRunLinks", valid_spawns)
+            _wf_write_task_file(project_id, task, "in_progress", work_log_entry="Blocked: supervisor did not produce Gateway-backed sessions_spawn linkage for every child task")
+            with _WORKFLOW_LOCK:
+                wf["phase"] = "blocked"
+                wf["error"] = "Supervisor delegation verification failed: missing Gateway sessions_spawn linkage"
+                wf["active"] = False
+            _wf_sync_project_workflow_meta(project_id, active=False, phase="blocked", current_task_id=task_id, active_agent=assignee)
+            _wf_persist_state(project_id)
+            return
+        if valid_spawns:
+            _wf_update_task_field(project_id, task_id, "childRunLinks", valid_spawns)
+            for child in child_tasks:
+                matching = next((call for call in valid_spawns if call.get("task_id") == child.get("id")), None)
+                _wf_update_task_field(project_id, child["id"], "workflowStatus", "spawned" if matching else "blocked")
         work_activity_text = _wf_format_activity_summary(work_activity)
         _wf_write_task_file(project_id, task, "in_progress", work_log_entry=f"Agent response:\n{agent_response[:2000]}\n\n**Activity:**\n{work_activity_text}")
 
@@ -11699,6 +11856,7 @@ def _wf_run_pipeline_inner(project_id, single_task, wf, stop_flag):
             if done_col:
                 _wf_move_task(project_id, task_id, done_col["id"], by="workflow")
 
+                _wf_update_task_field(project_id, task_id, "workflowStatus", "completed")
                 # Write completion with activity summary
                 completion_entry = f"Task completed — all review checks passed\n\n### Task Completion Summary\n{activity_summary}"
                 _wf_write_task_file(project_id, task, "done", work_log_entry=completion_entry)
@@ -12082,6 +12240,8 @@ def _handle_workflow_start(project_id, body=None):
             "active": True,
             "generation": int(time.time() * 1000),
             "autoMode": auto_mode,
+            # A dispatch request may pin the pipeline to one explicitly named task.
+            "targetTaskId": body.get("taskId"),
             "currentTaskId": None,
             "phase": "starting",
             "error": None,
@@ -12110,7 +12270,49 @@ def _handle_workflow_start(project_id, body=None):
         wf["thread"] = t
     t.start()
 
-    return {"ok": True, "status": "started", "autoMode": auto_mode}
+    return {"ok": True, "status": "started", "autoMode": auto_mode, "taskId": body.get("taskId")}
+
+
+def _handle_workflow_dispatch(project_id, task_id, body=None):
+    """Dispatch one explicitly selected Workboard task and optional child assignments.
+
+    This is deliberately separate from the legacy project-wide workflow start: it
+    never searches the backlog and requires an assigned, non-completed task.
+    """
+    body = body or {}
+    if body.get("confirm") is not True:
+        return {"error": "Explicit confirmation required", "_status": 400}
+    data = _load_projects()
+    project = next((p for p in data.get("projects", []) if p.get("id") == project_id), None)
+    if not project:
+        return {"error": "Project not found", "_status": 404}
+    task = next((t for t in project.get("tasks", []) if t.get("id") == task_id), None)
+    if not task:
+        return {"error": "Task not found", "_status": 404}
+    if task.get("completedAt"):
+        return {"error": "Task is already completed", "_status": 409}
+    if not task.get("assignee"):
+        return {"error": "Assign an agent before dispatching", "_status": 400}
+    with _WORKFLOW_LOCK:
+        if _WORKFLOW_STATE.get(project_id, {}).get("active"):
+            return {"error": "Workflow already running for this project", "_status": 409}
+    children = body.get("children", [])
+    if not isinstance(children, list) or len(children) > 20:
+        return {"error": "children must be a list of at most 20 assignments", "_status": 400}
+    created = []
+    for child in children:
+        if not isinstance(child, dict) or not str(child.get("title") or "").strip() or not child.get("assignee"):
+            return {"error": "Each child assignment needs title and assignee", "_status": 400}
+        child_body = dict(child)
+        child_body.update({"by": "dispatch", "parentTaskId": task_id})
+        result = _handle_task_create(project_id, child_body)
+        if result.get("_status", 200) >= 400:
+            return result
+        created.append(result.get("task"))
+    start = _handle_workflow_start(project_id, {"autoMode": False, "taskId": task_id})
+    if start.get("_status", 200) >= 400:
+        return start
+    return {"ok": True, "status": "dispatched", "taskId": task_id, "children": created}
 
 
 def _handle_workflow_stop(project_id):
@@ -15337,8 +15539,31 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        global VO_CONFIG, WORKSPACE_BASE, _discovered_roster, _discovered_at
         parsed_url = urllib.parse.urlparse(self.path)
         request_path = parsed_url.path
+        # Provider-neutral broker: agents authenticate here, never against raw CDP.
+        # Keep this dispatch in do_POST; GET must not expose a control endpoint.
+        if request_path == "/api/browser/action":
+            if not browser_control.authorize(self.headers, VO_CONFIG):
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"ok":false,"error":"browser authorization required"}')
+                return
+            result = {"ok": False, "status": 400, "error": "Invalid request"}
+            try:
+                length = min(int(self.headers.get("Content-Length", 0) or 0), 128 * 1024)
+                body = json.loads(self.rfile.read(length) if length else b"{}")
+                result = browser_control.action(VO_CONFIG, body)
+            except Exception as exc:
+                result = {"ok": False, "status": 400, "error": str(exc)}
+            self.send_response(int(result.pop("status", 200 if result.get("ok") else 502)))
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
         # --- SETUP WIZARD ---
         if self.path == "/setup/save":
             length = int(self.headers.get('Content-Length', 0))
@@ -15403,7 +15628,6 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
                 with open(cfg_path, "w") as f:
                     json.dump(existing, f, indent=2)
                 # Reload config and re-discover if path or gateway changed
-                global VO_CONFIG, WORKSPACE_BASE, _discovered_roster, _discovered_at
                 old_path = WORKSPACE_BASE
                 old_gw = GATEWAY_URL
                 old_token = _get_gateway_token()
@@ -16367,6 +16591,19 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             result.pop("_status", None)
             self.wfile.write(json.dumps(result).encode())
+        elif self.path.startswith("/api/projects/") and "/tasks/" in self.path and self.path.endswith("/workflow/dispatch"):
+            rest = self.path.split("/api/projects/", 1)[1]
+            proj_id, task_part = rest.split("/tasks/", 1)
+            task_id = task_part.rsplit("/workflow/dispatch", 1)[0].strip("/")
+            length = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+            result = _handle_workflow_dispatch(proj_id, task_id, body)
+            self.send_response(result.get("_status", 200))
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            result.pop("_status", None)
+            self.wfile.write(json.dumps(result).encode())
         elif self.path.startswith("/api/projects/") and self.path.endswith("/workflow/start"):
             proj_id = self.path.split("/api/projects/")[1].rsplit("/workflow/start", 1)[0]
             length = int(self.headers.get('Content-Length', 0))
@@ -17316,7 +17553,8 @@ def _wf_auto_resume_on_startup():
         print(f"[WORKFLOW AUTO-RESUME] Error: {e}")
 
 
-if __name__ == "__main__":
+def main():
+    """Start the Virtual Office HTTP and WebSocket services."""
     # Start API usage collector background thread
     _api_usage_collector.start()
     print("📊 API usage collector started (polls every 60s)")
@@ -17331,3 +17569,7 @@ if __name__ == "__main__":
 
     # Start HTTP server in main thread
     start_http_server()
+
+
+if __name__ == "__main__":
+    main()

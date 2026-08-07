@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "my-virtual-office-free"
+version = "0.1.0"
+description = "Self-hosted 2D virtual office for AI agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["websockets>=12,<16"]
+
+[tool.setuptools]
+package-dir = {"" = "app"}
+py-modules = [
+  "server", "browser_control", "discovery", "gateway_presence",
+  "layout_library", "license", "project_store", "accountant_report",
+  "token_optimizer"
+]
+
+[tool.setuptools.packages.find]
+where = ["app"]
+include = ["providers*"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "requests>=2"]
+
+[project.scripts]
+virtual-office-server = "server:main"

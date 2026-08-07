@@ -24,6 +24,7 @@
   const HERMES_APPROVAL_POLL_MS = 1500;
   const HERMES_HISTORY_POLL_MS = 250;
   const CHAT_SELECTION_STORAGE_KEY = 'vo-chat-selection-v1';
+  const CHAT_UI_STORAGE_KEY = 'vo-chat-ui-v1';
   const secondarySlotButtons = Array.from(document.querySelectorAll('[data-chat-slot-toggle]'));
   let activeSecondarySlot = null;
   const secondaryPanelPlaceholders = {
@@ -61,6 +62,27 @@
     } catch (e) {
       console.warn('[chat] Failed to save chat selection:', e);
     }
+  }
+
+  function readSavedChatUi() {
+    try {
+      const value = JSON.parse(localStorage.getItem(CHAT_UI_STORAGE_KEY) || '{}');
+      return value && typeof value === 'object' ? value : {};
+    } catch (e) { return {}; }
+  }
+
+  function saveChatUiState() {
+    const panel = document.getElementById('chat-panel');
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    const state = readSavedChatUi();
+    state.primary = {
+      open: panel.classList.contains('open'),
+      mode: panel.classList.contains('snap-left') ? 'snap-left' : panel.classList.contains('snap-right') ? 'snap-right' : panel.classList.contains('floating') ? 'floating' : 'docked-right',
+      width: Math.round(rect.width), height: Math.round(rect.height),
+      left: panel.style.left || '', top: panel.style.top || '', right: panel.style.right || ''
+    };
+    try { localStorage.setItem(CHAT_UI_STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
   }
 
   function formatSessionTimestamp(value) {
@@ -425,11 +447,16 @@
         if (isMatch) matched = true;
       }
       if (!matched) {
+        // The roster contains one representative option per agent, while the
+        // selected session may be an older/non-main session. Keep that session
+        // key instead of silently replacing it with agent:<id>:main.
         const fallback = options.find(opt => opt.value === this.selectedAgentKey) || options.find(opt => opt.dataset.sessionKey === this.sessionKey) || options[0];
         if (fallback) {
           fallback.selected = true;
           this.selectedAgentKey = fallback.value;
-          this.sessionKey = fallback.dataset.sessionKey || this.sessionKey;
+          if (!this.sessionKey || !this.sessionKey.startsWith('agent:')) {
+            this.sessionKey = fallback.dataset.sessionKey || this.sessionKey;
+          }
           this.saveSelection();
         }
       }
@@ -3879,6 +3906,7 @@
         if (primaryWindow.root.classList.contains('open')) _positionExteriorTabs();
       }, 320);
     }
+    saveChatUiState();
     if (shouldOpen && !ws) connectGateway();
     if (shouldOpen) {
       primaryWindow.input.focus();
@@ -3893,6 +3921,26 @@
   chatBtn.addEventListener('click', () => {
     setPrimaryPanelOpen(!primaryWindow.root.classList.contains('open'));
   });
+
+  // Restore the user's last chat visibility and docking choice after reload.
+  setTimeout(() => {
+    const saved = readSavedChatUi().primary;
+    if (!saved) return;
+    const panel = primaryWindow.root;
+    if (saved.width) panel.style.width = Math.max(260, saved.width) + 'px';
+    if (saved.height) panel.style.height = Math.max(280, saved.height) + 'px';
+    if (saved.mode === 'snap-left') _chatSnapTo('left');
+    else if (saved.mode === 'snap-right' || saved.mode === 'docked-right') _chatSnapTo('right');
+    else if (saved.mode === 'floating') {
+      panel.classList.add('floating');
+      panel.style.left = saved.left || '';
+      panel.style.top = saved.top || '';
+      panel.style.right = 'auto';
+    }
+    if (saved.open) setPrimaryPanelOpen(true);
+    else saveChatUiState();
+  }, 180);
+  window.addEventListener('beforeunload', saveChatUiState);
 
   const chatUrlParams = new URLSearchParams(window.location.search);
   const chatViewParam = chatUrlParams.get('chatView');

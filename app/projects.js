@@ -81,7 +81,7 @@
             title: 'Bug Tracking',
             description: 'Track and resolve bugs systematically',
             columns: [
-                { title: 'Reported', color: '#dc3545' },
+                { title: 'Отчётed', color: '#dc3545' },
                 { title: 'Confirmed', color: '#fd7e14' },
                 { title: 'In Progress', color: '#ffc107' },
                 { title: 'Fixed', color: '#0d6efd' },
@@ -167,7 +167,7 @@
             const r = await fetch('/api/projects/from-template', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             return r.json();
         },
-        async getReport(projectId) {
+        async getОтчёт(projectId) {
             const r = await fetch(`/api/projects/${projectId}/report`);
             return r.json();
         },
@@ -182,6 +182,13 @@
         // Workflow API
         async workflowStart(projectId, autoMode) {
             const r = await fetch(`/api/projects/${projectId}/workflow/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoMode }) });
+            return r.json();
+        },
+        async dispatchTask(projectId, taskId, children = []) {
+            const r = await fetch(`/api/projects/${projectId}/tasks/${taskId}/workflow/dispatch`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirm: true, children })
+            });
             return r.json();
         },
         async workflowStop(projectId) {
@@ -251,7 +258,7 @@
     }
 
     /** Animate a task card deletion (returns promise that resolves when animation done) */
-    function animateTaskDelete(taskId) {
+    function animateTaskУдалить(taskId) {
         return new Promise(resolve => {
             const card = document.getElementById(`task-${taskId}`);
             if (card) {
@@ -301,7 +308,7 @@
             const container = document.getElementById('sidebar-projects-lb');
             if (!container) return;
             if (lb.length === 0) {
-                container.innerHTML = '<div class="proj-lb-empty">No scores yet — complete tasks to earn XP!</div>';
+                container.innerHTML = '<div class="proj-lb-empty">Пока нет результатов — выполняйте задачи, чтобы получать XP!</div>';
                 return;
             }
             const top5 = lb.slice(0, 5);
@@ -449,7 +456,7 @@
             bindListEvents();
             updateSidebar();
         } catch (e) {
-            mc.innerHTML = `<div class="proj-loading"><div>⚠️ Failed to load projects</div><div style="font-size:10px;color:#555">${escHtml(String(e))}</div></div>`;
+            mc.innerHTML = `<div class="proj-loading"><div>⚠️ Не удалось загрузить проекты</div><div style="font-size:10px;color:#555">${escHtml(String(e))}</div></div>`;
         }
     }
 
@@ -491,14 +498,14 @@
             <span class="proj-toolbar-title">📋 Projects</span>
             <button class="proj-btn proj-btn-primary" onclick="ProjMgr.newProjectDialog()">➕ New Project</button>
             <button class="proj-btn" onclick="ProjMgr.showTemplatesView()">📁 Templates</button>
-            <input class="proj-search" id="proj-search" type="text" placeholder="🔍 Search projects…" value="${escHtml(filters.search)}" oninput="ProjMgr.filterChange('search', this.value)">
+            <input class="proj-search" id="proj-search" type="text" placeholder="🔍 Поиск проектов…" value="${escHtml(filters.search)}" oninput="ProjMgr.filterChange('search', this.value)">
             <div class="proj-filter-row">
                 <select class="proj-select" onchange="ProjMgr.filterChange('status', this.value)">
                     <option value="" ${!filters.status ? 'selected' : ''}>All Statuses</option>
                     <option value="active" ${filters.status === 'active' ? 'selected' : ''}>Active</option>
                     <option value="paused" ${filters.status === 'paused' ? 'selected' : ''}>Paused</option>
                     <option value="completed" ${filters.status === 'completed' ? 'selected' : ''}>Completed</option>
-                    <option value="archived" ${filters.status === 'archived' ? 'selected' : ''}>Archived</option>
+                    <option value="archived" ${filters.status === 'archived' ? 'selected' : ''}>Архивироватьd</option>
                 </select>
                 <select class="proj-select" onchange="ProjMgr.filterChange('priority', this.value)">
                     <option value="" ${!filters.priority ? 'selected' : ''}>All Priorities</option>
@@ -549,9 +556,9 @@
             <div class="proj-card-header">
                 <div class="proj-card-title">${escHtml(p.title)}</div>
                 <div class="proj-card-actions" onclick="event.stopPropagation()">
-                    <button class="proj-btn proj-btn-sm proj-btn-icon" title="Report" onclick="ProjMgr.showReport('${p.id}')">📊</button>
-                    <button class="proj-btn proj-btn-sm proj-btn-icon" title="Archive" onclick="ProjMgr.archiveProject('${p.id}', event)">📁</button>
-                    <button class="proj-btn proj-btn-sm proj-btn-icon" title="Delete" onclick="ProjMgr.deleteProject('${p.id}', event)">🗑️</button>
+                    <button class="proj-btn proj-btn-sm proj-btn-icon" title="Отчёт" onclick="ProjMgr.showОтчёт('${p.id}')">📊</button>
+                    <button class="proj-btn proj-btn-sm proj-btn-icon" title="Архивировать" onclick="ProjMgr.archiveProject('${p.id}', event)">📁</button>
+                    <button class="proj-btn proj-btn-sm proj-btn-icon" title="Удалить" onclick="ProjMgr.deleteProject('${p.id}', event)">🗑️</button>
                 </div>
             </div>
             ${p.description ? `<div class="proj-card-desc">${escHtml(p.description)}</div>` : ''}
@@ -604,8 +611,8 @@
             <span class="proj-badge badge-${p.priority || 'medium'}">${p.priority || 'medium'}</span>
             <div style="flex:1"></div>
             <div class="proj-workflow-controls" id="proj-wf-controls">
-                <button class="proj-btn proj-btn-sm proj-btn-start" id="wf-start-btn" onclick="ProjMgr.workflowStart()" title="Start workflow">▶ Start</button>
-                <button class="proj-btn proj-btn-sm proj-btn-stop hidden" id="wf-stop-btn" onclick="ProjMgr.workflowStop()" title="Stop workflow">⏹ Stop</button>
+                <button class="proj-btn proj-btn-sm proj-btn-start" id="wf-start-btn" onclick="ProjMgr.workflowStart()" title="Запустить процесс">▶ Запустить</button>
+                <button class="proj-btn proj-btn-sm proj-btn-stop hidden" id="wf-stop-btn" onclick="ProjMgr.workflowStop()" title="Остановить процесс">⏹ Остановить</button>
                 <div class="proj-auto-toggle" title="Auto Mode: automatically process next backlog task when current finishes">
                     <label class="proj-toggle-switch">
                         <input type="checkbox" id="wf-auto-toggle" ${p.autoMode ? 'checked' : ''} onchange="ProjMgr.toggleAutoMode(this.checked)">
@@ -616,12 +623,12 @@
                 <span class="proj-wf-status" id="wf-status-badge"></span>
             </div>
             <button class="proj-btn proj-btn-sm" onclick="ProjMgr.editProjectDialog('${p.id}')">✏️ Edit</button>
-            <button class="proj-btn proj-btn-sm" onclick="ProjMgr.showReport('${p.id}')">📊 Report</button>
+            <button class="proj-btn proj-btn-sm" onclick="ProjMgr.showОтчёт('${p.id}')">📊 Отчёт</button>
             <button class="proj-btn proj-btn-sm" onclick="ProjMgr.saveAsTemplateDialog('${p.id}')">💾 Template</button>
         </div>
         ${p.description ? `
         <div class="proj-board-header">
-            <span class="proj-board-desc-toggle" onclick="this.nextElementSibling.classList.toggle('expanded');this.textContent=this.nextElementSibling.classList.contains('expanded')?'▲ Hide description':'▼ Show description'">▼ Show description</span>
+            <span class="proj-board-desc-toggle" onclick="this.nextElementSibling.classList.toggle('expanded');this.textContent=this.nextElementSibling.classList.contains('expanded')?'▲ Скрыть описание':'▼ Показать описание'">▼ Показать описание</span>
             <div class="proj-board-desc">${escHtml(p.description)}</div>
         </div>` : ''}
         ${renderBoardScoreboard()}
@@ -633,7 +640,7 @@
                     <span class="proj-wf-chat-live" id="proj-chat-live-dot"></span>
                 </div>
                 <div class="proj-chat-messages" id="proj-wf-chat-messages">
-                    <div class="proj-chat-empty">Workflow chat will appear here when a task is being worked on.</div>
+                    <div class="proj-chat-empty">Здесь появится чат процесса, когда задача будет выполняться.</div>
                 </div>
             </div>
             ${cols.map(col => renderColumn(col, tasks)).join('')}
@@ -648,7 +655,7 @@
                 <div class="proj-col-dot"></div>
                 <div class="proj-col-title" ondblclick="ProjMgr.renameColumn('${col.id}')">${escHtml(col.title)}</div>
                 <span class="proj-col-count">${tasks.length}</span>
-                <button class="proj-col-add-btn" onclick="ProjMgr.showQuickAdd('${col.id}')" title="Add task">+</button>
+                <button class="proj-col-add-btn" onclick="ProjMgr.showQuickAdd('${col.id}')" title="Добавить задачу">+</button>
             </div>
             <div class="proj-col-tasks" id="tasks-${col.id}"
                 ondragover="ProjMgr.onDragOver(event, '${col.id}')"
@@ -657,7 +664,7 @@
                 ${tasks.map(t => renderTaskCard(t)).join('')}
             </div>
             <div class="proj-quick-add hidden" id="quick-add-${col.id}">
-                <input class="proj-quick-add-input" id="quick-input-${col.id}" type="text" placeholder="Task title… (Enter to add)">
+                <input class="proj-quick-add-input" id="quick-input-${col.id}" type="text" placeholder="Название задачи… (Enter — добавить)">
                 <div class="proj-quick-add-actions">
                     <button class="proj-btn proj-btn-sm proj-btn-primary" onclick="ProjMgr.submitQuickAdd('${col.id}')">Add</button>
                     <button class="proj-btn proj-btn-sm" onclick="ProjMgr.hideQuickAdd('${col.id}')">Cancel</button>
@@ -846,7 +853,7 @@
         }
         // Persist
         const updates = p.tasks.map(t => ({ id: t.id, columnId: t.columnId, order: t.order || 0 }));
-        api.reorderTasks(p.id, updates).catch(() => toast('Save failed', 'error'));
+        api.reorderTasks(p.id, updates).catch(() => toast('Сохранить failed', 'error'));
         // Also update task's columnId via task update for activity log
         if (oldColId !== colId) {
             api.updateTask(p.id, taskId, { columnId: colId, order: task.order }).then(result => {
@@ -1071,13 +1078,13 @@
         <div class="proj-detail-header">
             <span style="font-size:11px;color:#888">Task Detail</span>
             <div style="display:flex;gap:6px">
-                <button class="proj-btn proj-btn-sm proj-btn-danger" onclick="ProjMgr.deleteCurrentTask()">🗑️ Delete</button>
+                <button class="proj-btn proj-btn-sm proj-btn-danger" onclick="ProjMgr.deleteCurrentTask()">🗑️ Удалить</button>
                 <button class="proj-btn proj-btn-sm" onclick="ProjMgr.duplicateTask('${task.id}')">📋 Duplicate</button>
                 <button class="proj-detail-close" onclick="ProjMgr.closeDetailPanel()">✕</button>
             </div>
         </div>
         <div class="proj-detail-body">
-            <input class="proj-detail-title-input" id="detail-title" value="${escHtml(task.title)}" placeholder="Task title">
+            <input class="proj-detail-title-input" id="detail-title" value="${escHtml(task.title)}" placeholder="Название задачи">
             
             <div class="proj-section">
                 <div class="proj-field">
@@ -1112,7 +1119,7 @@
                     <label class="proj-field-label">Tags</label>
                     <div class="proj-tag-input-wrap" id="detail-tags-wrap" onclick="document.getElementById('detail-tag-in').focus()">
                         ${(task.tags || []).map(t => `<span class="proj-tag">${escHtml(t)}<span class="tag-remove" onclick="ProjMgr.removeTag('${escHtml(t)}')">×</span></span>`).join('')}
-                        <input class="proj-tag-input" id="detail-tag-in" placeholder="Add tag…" onkeydown="ProjMgr.handleTagKey(event)">
+                        <input class="proj-tag-input" id="detail-tag-in" placeholder="Добавить тег…" onkeydown="ProjMgr.handleTagKey(event)">
                     </div>
                 </div>
             </div>
@@ -1123,10 +1130,10 @@
                     <button class="proj-desc-tab active" id="desc-tab-edit" onclick="ProjMgr.switchDescTab('edit')">Edit</button>
                     <button class="proj-desc-tab" id="desc-tab-preview" onclick="ProjMgr.switchDescTab('preview')">Preview</button>
                 </div>
-                <textarea class="proj-detail-textarea" id="detail-desc" rows="4" placeholder="Task description (Markdown supported)">${escHtml(task.description || '')}</textarea>
+                <textarea class="proj-detail-textarea" id="detail-desc" rows="4" placeholder="Описание задачи (поддерживается Markdown)">${escHtml(task.description || '')}</textarea>
                 <div class="proj-desc-preview hidden" id="detail-desc-preview">${simpleMarkdown(task.description || '')}</div>
                 <div style="text-align:right;margin-top:4px">
-                    <button class="proj-btn proj-btn-sm proj-btn-gold" onclick="ProjMgr.saveDescription()">💾 Save</button>
+                    <button class="proj-btn proj-btn-sm proj-btn-gold" onclick="ProjMgr.saveDescription()">💾 Сохранить</button>
                 </div>
             </div>
 
@@ -1146,13 +1153,13 @@
                     ${checklist.map((c, i) => `
                     <li class="proj-checklist-item ${c.done ? 'done' : ''}">
                         <input type="checkbox" ${c.done ? 'checked' : ''} onchange="ProjMgr.toggleChecklistItem(${i}, this.checked)">
-                        <span class="proj-checklist-item-text" ondblclick="ProjMgr.editChecklistItem(${i})" title="Double-click to edit">${escHtml(c.text)}</span>
+                        <span class="proj-checklist-item-text" ondblclick="ProjMgr.editChecklistItem(${i})" title="Дважды щёлкните для изменения">${escHtml(c.text)}</span>
                         <button class="proj-checklist-edit" onclick="ProjMgr.editChecklistItem(${i})" title="Edit">✏️</button>
                         <button class="proj-checklist-delete" onclick="ProjMgr.deleteChecklistItem(${i})">×</button>
                     </li>`).join('')}
                 </ul>
                 <div style="display:flex;gap:6px;margin-top:6px">
-                    <input class="proj-detail-input" id="new-checklist-item" type="text" placeholder="Add checklist item…" onkeydown="if(event.key==='Enter')ProjMgr.addChecklistItem()" style="flex:1">
+                    <input class="proj-detail-input" id="new-checklist-item" type="text" placeholder="Добавить пункт списка…" onkeydown="if(event.key==='Enter')ProjMgr.addChecklistItem()" style="flex:1">
                     <button class="proj-btn proj-btn-sm" onclick="ProjMgr.addChecklistItem()">Add</button>
                 </div>
             </div>
@@ -1181,7 +1188,7 @@
                 </div>
                 ${(task.reviewCheck && task.reviewCheck.length) ? `
                 <div style="text-align:right;margin-top:6px">
-                    <button class="proj-btn proj-btn-sm proj-btn-gold" onclick="ProjMgr.saveReviewCheck()">💾 Save Review</button>
+                    <button class="proj-btn proj-btn-sm proj-btn-gold" onclick="ProjMgr.saveReviewCheck()">💾 Сохранить Review</button>
                 </div>` : ''}
             </div>` : ''}
 
@@ -1198,7 +1205,7 @@
                         <div class="proj-comment-text">${simpleMarkdown(c.text)}</div>
                     </div>`).join('')}
                 </div>
-                <textarea class="proj-detail-textarea" id="detail-comment-input" rows="2" placeholder="Add a comment… (Markdown supported)"></textarea>
+                <textarea class="proj-detail-textarea" id="detail-comment-input" rows="2" placeholder="Добавить комментарий… (поддерживается Markdown)"></textarea>
                 <div style="text-align:right;margin-top:4px">
                     <button class="proj-btn proj-btn-sm proj-btn-gold" onclick="ProjMgr.submitComment()">Post Comment</button>
                 </div>
@@ -1234,18 +1241,18 @@
         const descEl = document.getElementById('detail-desc');
         if (descEl) {
             descEl.oninput = () => {
-                clearTimeout(state._descAutoSaveTimer);
-                state._descAutoSaveTimer = setTimeout(() => {
+                clearTimeout(state._descAutoСохранитьTimer);
+                state._descAutoСохранитьTimer = setTimeout(() => {
                     saveDescription();
                 }, 1500);
             };
         }
-        // Save button: cancel debounce then save immediately
-        const descSaveBtn = document.querySelector('.proj-btn-gold[onclick*="saveDescription"]');
-        if (descSaveBtn) {
-            descSaveBtn.onclick = (e) => {
+        // Сохранить button: cancel debounce then save immediately
+        const descСохранитьBtn = document.querySelector('.proj-btn-gold[onclick*="saveDescription"]');
+        if (descСохранитьBtn) {
+            descСохранитьBtn.onclick = (e) => {
                 e.preventDefault();
-                clearTimeout(state._descAutoSaveTimer);
+                clearTimeout(state._descAutoСохранитьTimer);
                 saveDescription();
             };
         }
@@ -1285,7 +1292,7 @@
         task.description = desc;
         // Visual feedback: disable save button during save
         const saveBtn = el.parentElement && el.parentElement.querySelector('.proj-btn-gold');
-        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Сохранение…'; }
         try {
             await api.updateTask(projId, taskId, { description: desc });
             // Also update the card on the board
@@ -1296,11 +1303,11 @@
                 const rendered = newCard.firstElementChild;
                 if (rendered) cardEl.replaceWith(rendered);
             }
-            if (saveBtn) { saveBtn.textContent = '✅ Saved'; }
+            if (saveBtn) { saveBtn.textContent = '✅ Сохранено'; }
             toast('Description saved', 'success');
-            setTimeout(() => { if (saveBtn) { saveBtn.textContent = '💾 Save'; saveBtn.disabled = false; } }, 1500);
+            setTimeout(() => { if (saveBtn) { saveBtn.textContent = '💾 Сохранить'; saveBtn.disabled = false; } }, 1500);
         } catch (e) {
-            if (saveBtn) { saveBtn.textContent = '💾 Save'; saveBtn.disabled = false; }
+            if (saveBtn) { saveBtn.textContent = '💾 Сохранить'; saveBtn.disabled = false; }
             toast('Failed to save description', 'error');
         }
     }
@@ -1326,7 +1333,7 @@
                 const rendered = newCard.firstElementChild;
                 if (rendered) cardEl.replaceWith(rendered);
             }
-        } catch (e) { toast('Save failed', 'error'); }
+        } catch (e) { toast('Сохранить failed', 'error'); }
     }
 
     async function updateTaskField(field, value) {
@@ -1453,16 +1460,16 @@
         } catch (e) { toast('Failed to add comment', 'error'); }
     }
 
-    // Delete / Duplicate task
+    // Удалить / Duplicate task
     async function deleteCurrentTask() {
         const task = state.currentTask;
         const p = state.currentProject;
         if (!task || !p) return;
-        if (!confirm(`Delete task "${task.title}"?`)) return;
+        if (!confirm(`Удалить task "${task.title}"?`)) return;
         try {
             closeDetailPanel();
             // Animate the deletion first
-            await animateTaskDelete(task.id);
+            await animateTaskУдалить(task.id);
             await api.deleteTask(p.id, task.id);
             p.tasks = p.tasks.filter(t => t.id !== task.id);
             const mc = getMainContent();
@@ -1479,7 +1486,7 @@
         const copy = { title: src.title + ' (copy)', description: src.description, columnId: src.columnId, priority: src.priority, tags: [...(src.tags || [])], checklist: (src.checklist || []).map(c => ({ ...c, id: genId(), done: false })) };
         try {
             const d = await api.createTask(p.id, copy);
-            if (d.task) { p.tasks.push(d.task); const mc = getMainContent(); if (mc) { mc.innerHTML = renderBoardView(); bindBoardEvents(); } toast('Task duplicated', 'success'); }
+            if (d.task) { p.tasks.push(d.task); const mc = getMainContent(); if (mc) { mc.innerHTML = renderBoardView(); bindBoardEvents(); } toast('Задача продублирована', 'success'); }
         } catch (e) { toast('Failed to duplicate', 'error'); }
     }
 
@@ -1506,11 +1513,11 @@
                 <div class="proj-form-title">📋 NEW PROJECT</div>
                 <div class="proj-form-group">
                     <label class="proj-form-label">Title *</label>
-                    <input class="proj-form-input" id="pf-title" type="text" placeholder="Project title" autofocus>
+                    <input class="proj-form-input" id="pf-title" type="text" placeholder="Название проекта" autofocus>
                 </div>
                 <div class="proj-form-group">
                     <label class="proj-form-label">Description</label>
-                    <textarea class="proj-form-textarea" id="pf-desc" placeholder="What is this project about?"></textarea>
+                    <textarea class="proj-form-textarea" id="pf-desc" placeholder="О чём этот проект?"></textarea>
                 </div>
                 <div class="proj-form-row">
                     <div class="proj-form-group">
@@ -1569,7 +1576,7 @@
                             <option value="active" ${data.status === 'active' ? 'selected' : ''}>Active</option>
                             <option value="paused" ${data.status === 'paused' ? 'selected' : ''}>Paused</option>
                             <option value="completed" ${data.status === 'completed' ? 'selected' : ''}>Completed</option>
-                            <option value="archived" ${data.status === 'archived' ? 'selected' : ''}>Archived</option>
+                            <option value="archived" ${data.status === 'archived' ? 'selected' : ''}>Архивироватьd</option>
                         </select>
                     </div>
                     <div class="proj-form-group">
@@ -1595,7 +1602,7 @@
                 <input type="hidden" id="pf-edit-id" value="${data.id || ''}">
                 <div class="proj-form-actions">
                     <button class="proj-btn" onclick="ProjMgr.hideFormModal()">Cancel</button>
-                    <button class="proj-btn proj-btn-primary" onclick="ProjMgr.submitEditProject()">Save Changes</button>
+                    <button class="proj-btn proj-btn-primary" onclick="ProjMgr.submitEditProject()">Сохранить Changes</button>
                 </div>
             </div>
             </div>`;
@@ -1616,7 +1623,7 @@
                 <input type="hidden" id="pf-tpl-proj-id" value="${data.id || ''}">
                 <div class="proj-form-actions">
                     <button class="proj-btn" onclick="ProjMgr.hideFormModal()">Cancel</button>
-                    <button class="proj-btn proj-btn-primary" onclick="ProjMgr.submitSaveTemplate()">Save Template</button>
+                    <button class="proj-btn proj-btn-primary" onclick="ProjMgr.submitСохранитьTemplate()">Сохранить Template</button>
                 </div>
             </div>
             </div>`;
@@ -1680,7 +1687,7 @@
     // ── PROJECT CRUD ──────────────────────────────────────────────
     async function archiveProject(id, e) {
         if (e) e.stopPropagation();
-        if (!confirm('Archive this project?')) return;
+        if (!confirm('Архивировать this project?')) return;
         try {
             await api.updateProject(id, { status: 'archived' });
             toast('Project archived', 'success');
@@ -1690,7 +1697,7 @@
 
     async function deleteProject(id, e) {
         if (e) e.stopPropagation();
-        if (!confirm('Delete this project? This cannot be undone.')) return;
+        if (!confirm('Удалить this project? This cannot be undone.')) return;
         try {
             await api.deleteProject(id);
             toast('Project deleted', 'success');
@@ -1749,13 +1756,13 @@
             </div>
             <div class="proj-tpl-actions">
                 <button class="proj-btn proj-btn-sm proj-btn-primary" onclick="ProjMgr.newProjectDialog('${tpl.id}')">Use Template</button>
-                ${!isBuiltin ? `<button class="proj-btn proj-btn-sm proj-btn-danger" onclick="ProjMgr.deleteTemplate('${tpl.id}')">Delete</button>` : ''}
+                ${!isBuiltin ? `<button class="proj-btn proj-btn-sm proj-btn-danger" onclick="ProjMgr.deleteTemplate('${tpl.id}')">Удалить</button>` : ''}
             </div>
         </div>`;
     }
 
     async function deleteTemplate(id) {
-        if (!confirm('Delete this template?')) return;
+        if (!confirm('Удалить this template?')) return;
         try {
             await api.deleteTemplate(id);
             state.templates = state.templates.filter(t => t.id !== id);
@@ -1771,7 +1778,7 @@
         showFormModal('save-template', p);
     }
 
-    async function submitSaveTemplate() {
+    async function submitСохранитьTemplate() {
         const title = (document.getElementById('pf-tpl-title') || {}).value.trim();
         const projectId = (document.getElementById('pf-tpl-proj-id') || {}).value;
         const desc = (document.getElementById('pf-tpl-desc') || {}).value || '';
@@ -1784,22 +1791,22 @@
     }
 
     // ── REPORT VIEW ───────────────────────────────────────────────
-    async function showReport(id) {
+    async function showОтчёт(id) {
         const mc = getMainContent();
         if (!mc) return;
         mc.innerHTML = renderListSkeleton();
         state.view = 'report';
         closeDetailPanel();
         try {
-            const d = await api.getReport(id);
+            const d = await api.getОтчёт(id);
             if (!d.report) throw new Error('No report');
-            mc.innerHTML = renderReportView(d.report);
+            mc.innerHTML = renderОтчётView(d.report);
         } catch (e) {
             mc.innerHTML = `<div class="proj-loading">⚠️ Failed to generate report</div>`;
         }
     }
 
-    function renderReportView(r) {
+    function renderОтчётView(r) {
         const { stats, columns, agentWorkload, timeline, title } = r;
         const maxColCount = Math.max(...columns.map(c => c.count), 1);
         const maxAgentCount = Math.max(...Object.values(agentWorkload || {}), 1);
@@ -1807,9 +1814,9 @@
         return `
         <div class="proj-toolbar">
             <button class="proj-btn" onclick="ProjMgr.backToList()">← Back</button>
-            <span class="proj-toolbar-title">📊 Report</span>
+            <span class="proj-toolbar-title">📊 Отчёт</span>
             <div style="flex:1"></div>
-            <button class="proj-btn proj-btn-sm" onclick="ProjMgr.exportReport()">📤 Export Markdown</button>
+            <button class="proj-btn proj-btn-sm" onclick="ProjMgr.exportОтчёт()">📤 Export Markdown</button>
         </div>
         <div class="proj-report-body">
             <div class="proj-report-header">
@@ -1889,13 +1896,13 @@
         </div>`;
     }
 
-    function exportReport() {
+    function exportОтчёт() {
         const mc = getMainContent();
         if (!mc) return;
         // Build markdown from DOM
         const title = mc.querySelector('.proj-report-title');
         const stats = mc.querySelectorAll('.proj-stat-card');
-        let md = `# ${title ? title.textContent : 'Project Report'}\n\n`;
+        let md = `# ${title ? title.textContent : 'Project Отчёт'}\n\n`;
         md += `*Generated: ${new Date().toLocaleString()}*\n\n`;
         md += `## Stats\n\n`;
         stats.forEach(s => {
@@ -1904,14 +1911,14 @@
             if (val && lbl) md += `- **${lbl.textContent}:** ${val.textContent}\n`;
         });
         // Copy to clipboard
-        navigator.clipboard.writeText(md).then(() => toast('Report copied to clipboard!', 'success')).catch(() => {
+        navigator.clipboard.writeText(md).then(() => toast('Отчёт copied to clipboard!', 'success')).catch(() => {
             const ta = document.createElement('textarea');
             ta.value = md;
             document.body.appendChild(ta);
             ta.select();
             document.execCommand('copy');
             ta.remove();
-            toast('Report copied!', 'success');
+            toast('Отчёт copied!', 'success');
         });
     }
 
@@ -1921,7 +1928,7 @@
         if (!el) return;
         const active = state.projects.filter(p => p.status === 'active').slice(0, 5);
         if (active.length === 0) {
-            el.innerHTML = '<div style="font-size:10px;color:#555;padding:4px">No active projects</div>';
+            el.innerHTML = '<div style="font-size:10px;color:#555;padding:4px">Нет активных проектов</div>';
             return;
         }
         el.innerHTML = active.map(p => {
@@ -2093,7 +2100,7 @@
         }
 
         if (msgs.length === 0) {
-            container.innerHTML = '<div class="proj-chat-empty">Workflow chat will appear here when a task is being worked on.</div>';
+            container.innerHTML = '<div class="proj-chat-empty">Здесь появится чат процесса, когда задача будет выполняться.</div>';
             return;
         }
 
@@ -2191,7 +2198,7 @@
                 'reworking': '🔧 Reworking...',
                 'awaiting_user_review': '👤 Needs Your Review',
                 'task_done': '✅ Task Complete',
-                'stopped': '⏹ Stopped',
+                'stopped': '⏹ Остановитьped',
                 'stalled': '⚠️ Stalled — click Start to resume',
                 'error': '❌ Error',
             };
@@ -2267,10 +2274,10 @@
         archiveProject,
         filterChange,
         showTemplatesView,
-        showReport,
-        exportReport,
+        showОтчёт,
+        exportОтчёт,
         saveAsTemplateDialog,
-        submitSaveTemplate,
+        submitСохранитьTemplate,
         deleteTemplate,
         openTaskDetail,
         closeDetailPanel,

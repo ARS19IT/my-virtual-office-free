@@ -4964,11 +4964,11 @@ function updateSidebar() {
         if (branch.id !== 'UNASSIGNED') {
             const editBtn = document.createElement('button');
             editBtn.textContent = '✏️';
-            editBtn.title = 'Edit branch';
+            editBtn.title = 'Изменить ветку';
             editBtn.onclick = function(e) { e.stopPropagation(); branchEditPrompt(branch.id); };
             const delBtn = document.createElement('button');
             delBtn.textContent = '🗑️';
-            delBtn.title = 'Delete branch';
+            delBtn.title = 'Удалить ветку';
             delBtn.onclick = function(e) { e.stopPropagation(); branchDeletePrompt(branch.id); };
             actions.appendChild(editBtn);
             actions.appendChild(delBtn);
@@ -4986,7 +4986,7 @@ function updateSidebar() {
         if (branch.id === 'UNASSIGNED') {
             const note = document.createElement('div');
             note.className = 'branch-unassigned-note';
-            note.textContent = 'Deleting a branch moves agents here.';
+            note.textContent = 'После удаления ветки агенты перемещаются сюда.';
             body.appendChild(note);
         }
         section.appendChild(body);
@@ -5001,9 +5001,9 @@ function updateSidebar() {
 setInterval(updateSidebar, 1000);
 
 function branchCreatePrompt() {
-    var name = prompt('New branch name:');
+    var name = prompt('Название новой ветки:');
     if (!name) return;
-    var emoji = prompt('Branch emoji:', '🏢') || '🏢';
+    var emoji = prompt('Эмодзи ветки:', '🏢') || '🏢';
     var idBase = name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'BRANCH';
     var id = idBase;
     var n = 2;
@@ -5033,16 +5033,16 @@ function branchEditPrompt(branchId) {
     var currentColor = branch.color || _getThemeColor(branch.theme) || '#888888';
 
     popup.innerHTML = '<div style="font-size:14px;font-weight:bold;color:#ffd700;margin-bottom:14px;">✏️ Edit Branch: ' + (branch.emoji || '') + ' ' + branch.name + '</div>' +
-        '<label style="font-size:12px;color:#aaa;">Branch Name</label>' +
+        '<label style="font-size:12px;color:#aaa;">Название ветки</label>' +
         '<input id="be-name" type="text" value="' + (branch.name || '') + '" style="width:100%;padding:8px;background:#0d0d1e;border:1px solid #2a2a4e;border-radius:6px;color:#e0e0e0;font-size:14px;margin:4px 0 10px;">' +
         '<label style="font-size:12px;color:#aaa;">Emoji</label>' +
         '<input id="be-emoji" type="text" value="' + (branch.emoji || '🏢') + '" style="width:60px;padding:8px;background:#0d0d1e;border:1px solid #2a2a4e;border-radius:6px;color:#e0e0e0;font-size:14px;margin:4px 0 10px;">' +
-        '<label style="font-size:12px;color:#aaa;">Branch Color</label>' +
+        '<label style="font-size:12px;color:#aaa;">Цвет ветки</label>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:4px 0 12px;">' +
         '<input id="be-color" type="color" value="' + currentColor + '" style="width:40px;height:32px;border:none;background:none;cursor:pointer;">' +
         '<span id="be-color-hex" style="font-size:12px;color:#888;">' + currentColor + '</span>' +
         '</div>' +
-        '<label style="font-size:12px;color:#aaa;">Agents in Branch</label>' +
+        '<label style="font-size:12px;color:#aaa;">Агенты в ветке</label>' +
         '<div id="be-agents" style="max-height:180px;overflow-y:auto;margin:4px 0 12px;border:1px solid #2a2a4e;border-radius:6px;padding:6px;background:#0d0d1e;"></div>' +
         '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">' +
         '<button id="be-cancel" style="padding:6px 16px;background:#333;border:1px solid #555;border-radius:6px;color:#ccc;cursor:pointer;font-size:12px;">Cancel</button>' +
@@ -5118,7 +5118,7 @@ function _getThemeColor(theme) {
 function branchDeletePrompt(branchId) {
     var branch = officeConfig.branches.find(function(b){ return b.id === branchId; });
     if (!branch) return;
-    if (!confirm('Delete branch "' + branch.name + '"? Agents will be moved to Unassigned.')) return;
+    if (!confirm('Удалить ветку "' + branch.name + '"? Agents will be moved to Unassigned.')) return;
     officeConfig.branches = officeConfig.branches.filter(function(b){ return b.id !== branchId; });
     _invalidateBranchCache();
     agents.forEach(function(a){ if (a.branch === branchId) a.branch = 'UNASSIGNED'; });
@@ -12654,9 +12654,13 @@ function _itemOverlaps(type, x, y, excludeId) {
 // When a desk has an assignedTo, move that agent's desk reference to this furniture item's position
 function _syncAgentToDesk(deskItem) {
     if (!deskItem.assignedTo) return;
+    var assignedKey = String(deskItem.assignedTo);
     for (var i = 0; i < agents.length; i++) {
-        if (agents[i].name === deskItem.assignedTo) {
-            var agent = agents[i];
+        var candidate = agents[i];
+        if (String(candidate.name) === assignedKey ||
+            String(candidate.id || '') === assignedKey ||
+            String(candidate.statusKey || '') === assignedKey) {
+            var agent = candidate;
             // Update the agent's desk position
             if (agent.desk.x !== deskItem.x || agent.desk.y !== deskItem.y) {
                 agent.desk = { x: deskItem.x, y: deskItem.y };
@@ -16748,12 +16752,10 @@ function toggleMtgCard(meetingId) {
 function toggleMtgResponse(respId, btn) {
     var el = document.getElementById(respId);
     if (!el) return;
-    el.classList.toggle('expanded');
-    if (el.classList.contains('expanded')) {
-        btn.textContent = '▲ collapse';
-    } else {
-        btn.textContent = '▼ expand';
-    }
+    var expanded = !el.classList.contains('expanded');
+    el.classList.toggle('expanded', expanded);
+    if (btn) btn.textContent = expanded ? '▲ collapse' : '▼ expand';
+    return expanded;
 }
 
 function openEndMeetingForm(meetingId) {
