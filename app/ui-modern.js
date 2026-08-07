@@ -106,30 +106,30 @@
         var modelsLink = links.length > 0 ? links[0] : null;
         var cronLink = links.length > 1 ? links[1] : null;
 
-        if (settingsBtn) settingsBtn.textContent = '⚙️ Settings';
-        if (editBtn) editBtn.textContent = '✏️ Edit Office';
-        if (agentBtn) agentBtn.textContent = '👥 Agents';
-        if (projectBtn) projectBtn.textContent = '📋 Projects';
-        if (expandBtn) expandBtn.textContent = '💬 Expand';
-        if (minimizeBtn) minimizeBtn.textContent = '🗨️ Minimize';
-        if (resetBtn) resetBtn.textContent = '🔍 Reset View';
-        if (smsBtn) smsBtn.textContent = '📞 SMS';
-        if (browserBtn) browserBtn.textContent = '🌐 Browser';
-        if (modelsLink && modelsLink.querySelector('button')) modelsLink.querySelector('button').textContent = '⚙️ Models';
-        if (cronLink && cronLink.querySelector('button')) cronLink.querySelector('button').textContent = '⏰ Cron';
+        if (settingsBtn) settingsBtn.textContent = '⚙️ Меню';
+        if (editBtn) editBtn.textContent = '✏️ Офис';
+        if (agentBtn) agentBtn.textContent = '👥 Агенты';
+        if (projectBtn) projectBtn.textContent = '📋 Проекты';
+        if (expandBtn) expandBtn.textContent = '💬 Развернуть';
+        if (minimizeBtn) minimizeBtn.textContent = '🗨️ Свернуть';
+        if (resetBtn) resetBtn.textContent = '🔍 Сбросить вид';
+        if (smsBtn) smsBtn.textContent = '📞 СМС';
+        if (browserBtn) browserBtn.textContent = '🌐 Браузер';
+        if (modelsLink && modelsLink.querySelector('button')) modelsLink.querySelector('button').textContent = '⚙️ Модели';
+        if (cronLink && cronLink.querySelector('button')) cronLink.querySelector('button').textContent = '⏰ Расписание';
 
         [
-            [settingsBtn, '⚙️ Settings'],
-            [editBtn, '✏️ Edit'],
-            [agentBtn, '👥 Agents'],
-            [projectBtn, '📋 Projects'],
-            [modelsLink && modelsLink.querySelector('button'), '⚙️ Models'],
-            [cronLink && cronLink.querySelector('button'), '⏰ Cron'],
-            [browserBtn, '🌐 Browser'],
-            [smsBtn, '📞 SMS'],
-            [expandBtn, '💬 Expand'],
-            [minimizeBtn, '🗨️ Minimize'],
-            [resetBtn, '🔍 Reset']
+            [settingsBtn, '⚙️ Меню'],
+            [editBtn, '✏️ Офис'],
+            [agentBtn, '👥 Агенты'],
+            [projectBtn, '📋 Проекты'],
+            [modelsLink && modelsLink.querySelector('button'), '⚙️ Модели'],
+            [cronLink && cronLink.querySelector('button'), '⏰ Расписание'],
+            [browserBtn, '🌐 Браузер'],
+            [smsBtn, '📞 СМС'],
+            [expandBtn, '💬 Развернуть'],
+            [minimizeBtn, '🗨️ Свернуть'],
+            [resetBtn, '🔍 Сбросить вид']
         ].forEach(function (entry) {
             if (!entry[0]) return;
             entry[0].dataset.mobileLabel = entry[1];

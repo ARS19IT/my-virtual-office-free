@@ -20,6 +20,9 @@
     var nodes = root.nodeType === 3 ? [root] : (root.querySelectorAll ? Array.prototype.slice.call(root.querySelectorAll('*')) : []);
     if (root.nodeType === 1) nodes.unshift(root);
     nodes.forEach(function (el) {
+      // The toolbar owns its Russian labels. Excluding it prevents the
+      // localization observer from racing ui-modern during page startup.
+      if (el.closest && el.closest('.toolbar')) return;
       if (!el || ['SCRIPT','STYLE','CODE','PRE','INPUT'].indexOf(el.tagName) >= 0) return;
       Array.prototype.slice.call(el.childNodes || []).forEach(function (n) {
         if (n.nodeType === 3) { var next=translateValue(n.nodeValue); if(next!==n.nodeValue)n.nodeValue=next; }
