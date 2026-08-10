@@ -8,7 +8,6 @@
     let tasks = [];
     let columns = [];
     let draggedCard = null;
-    let panelDrag = null;
 
     function esc(value) {
         return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
@@ -18,33 +17,6 @@
     function showError(message) {
         error().textContent = message || '';
         error().style.display = message ? 'block' : 'none';
-    }
-    function restorePanelPosition() {
-        const saved = (() => { try { return JSON.parse(localStorage.getItem('task-board-position') || 'null'); } catch (_) { return null; } })();
-        const el = panel();
-        const maxLeft = Math.max(6, window.innerWidth - el.offsetWidth - 6);
-        const maxTop = Math.max(48, window.innerHeight - Math.min(el.offsetHeight, window.innerHeight) - 6);
-        if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
-            el.style.left = `${Math.min(maxLeft, Math.max(6, saved.left))}px`;
-            el.style.top = `${Math.min(maxTop, Math.max(48, saved.top))}px`;
-        } else el.style.left = `${Math.max(6, (window.innerWidth - el.offsetWidth) / 2)}px`;
-    }
-    function startPanelDrag(event) {
-        if (event.target.closest('button')) return;
-        const el = panel(), rect = el.getBoundingClientRect();
-        panelDrag = { pointerId: event.pointerId, dx: event.clientX - rect.left, dy: event.clientY - rect.top };
-        el.setPointerCapture?.(event.pointerId); event.preventDefault();
-    }
-    function movePanel(event) {
-        if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
-        const el = panel(), maxLeft = Math.max(0, innerWidth - el.offsetWidth), maxTop = Math.max(0, innerHeight - 48);
-        el.style.left = `${Math.min(maxLeft, Math.max(0, event.clientX - panelDrag.dx))}px`;
-        el.style.top = `${Math.min(maxTop, Math.max(0, event.clientY - panelDrag.dy))}px`;
-    }
-    function endPanelDrag(event) {
-        if (!panelDrag || event.pointerId !== panelDrag.pointerId) return;
-        const el = panel(); panelDrag = null;
-        try { localStorage.setItem('task-board-position', JSON.stringify({ left: el.offsetLeft, top: el.offsetTop })); } catch (_) {}
     }
     function agentName(id) {
         const agent = agents.find(a => a.key === id || a.statusKey === id || a.agentId === id || a.id === id);
@@ -207,9 +179,6 @@
             showError(err.message || 'Request failed');
         }
     }
-    document.querySelector('#taskBoardPanel .task-board-header')?.addEventListener('pointerdown', startPanelDrag);
-    panel()?.addEventListener('pointermove', movePanel); panel()?.addEventListener('pointerup', endPanelDrag); panel()?.addEventListener('pointercancel', endPanelDrag);
-    window.addEventListener('resize', () => { if (!panelDrag) restorePanelPosition(); });
-    window.openTaskBoard = function () { const element = panel(); if (element) { element.classList.remove('hidden'); restorePanelPosition(); load(); } };
+    window.openTaskBoard = function () { const element = panel(); if (element) { element.classList.remove('hidden'); load(); } };
     window.closeTaskBoard = function () { panel()?.classList.add('hidden'); };
 }());
