@@ -9596,8 +9596,14 @@ def _handle_task_board():
     """GET /api/task-board — flattened, read-only task board projection."""
     data = _load_projects()
     cards = []
+    board_columns = []
     for project in data.get("projects", []):
         columns = {c.get("id"): c for c in project.get("columns", [])}
+        for column in sorted(project.get("columns", []), key=lambda item: item.get("order", 0)):
+            board_columns.append({
+                "id": column.get("id"), "title": column.get("title", "Uncategorized"),
+                "order": column.get("order", 0), "projectId": project.get("id"),
+            })
         for task in project.get("tasks", []):
             checklist = task.get("checklist") if isinstance(task.get("checklist"), list) else []
             done = sum(1 for item in checklist if isinstance(item, dict) and item.get("done"))
@@ -9622,7 +9628,8 @@ def _handle_task_board():
         handoff = by_task.get((card["projectId"], card["id"]))
         if handoff:
             card["handoff"] = handoff
-    return {"ok": True, "tasks": cards, "handoffs": handoffs, "generatedAt": _proj_now()}
+    return {"ok": True, "tasks": cards, "columns": board_columns,
+            "handoffs": handoffs, "generatedAt": _proj_now()}
 
 
 def _task_board_command_message(record):
@@ -9813,6 +9820,35 @@ def _handle_task_board_assignment(project_id, task_id, body):
                 "expectedVersion": version + 1, "task": task}
     TASK_BOARD_OUTBOX.update(key, response=response)
     return response
+
+
+def _handle_task_board_move(project_id, task_id, body):
+    """Move a board card with optimistic concurrency protection."""
+    column_id = body.get("columnId")
+    if not isinstance(column_id, str) or not column_id.strip():
+        return {"error": "columnId is required", "_status": 400}
+    if not isinstance(body.get("expectedVersion"), int):
+        return {"error": "expectedVersion is required", "_status": 400}
+    data = _load_projects()
+    project = next((p for p in data.get("projects", []) if p.get("id") == project_id), None)
+    task = next((t for t in (project or {}).get("tasks", []) if t.get("id") == task_id), None)
+    if not project:
+        return {"error": "Project not found", "_status": 404}
+    if not task:
+        return {"error": "Task not found", "_status": 404}
+    version = task.get("version", 0)
+    if body["expectedVersion"] != version:
+        return {"error": "Task version is stale", "code": "stale_version", "expectedVersion": version, "_status": 409}
+    if not any(c.get("id") == column_id for c in project.get("columns", [])):
+        return {"error": "Column not found", "code": "unknown_column", "_status": 422}
+    if task.get("columnId") == column_id:
+        return {"ok": True, "status": "unchanged", "expectedVersion": version, "task": task}
+    task["columnId"] = column_id
+    task["version"] = version + 1
+    task["updatedAt"] = _proj_now()
+    project["updatedAt"] = task["updatedAt"]
+    _save_projects(data)
+    return {"ok": True, "status": "moved", "expectedVersion": version + 1, "task": task}
 
 
 def _handle_project_get(project_id):
@@ -15635,7 +15671,12 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
                 idempotency_key = self.headers.get("Idempotency-Key", "").strip()
                 if idempotency_key:
                     body["idempotencyKey"] = idempotency_key
-                result = _handle_task_board_assignment(proj_id, task_id, body)
+                if "columnId" in body:
+                    with _PROJECTS_FILE_LOCK:
+                        result = _handle_task_board_move(proj_id, task_id, body)
+                else:
+                    with _PROJECTS_FILE_LOCK:
+                        result = _handle_task_board_assignment(proj_id, task_id, body)
             else:
                 result = {"error": "Bad task-board path", "_status": 400}
             self.send_response(result.get("_status", 200))

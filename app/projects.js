@@ -809,7 +809,7 @@
         }
     }
 
-    function onDrop(e, colId) {
+    async function onDrop(e, colId) {
         e.preventDefault();
         if (_dragOverFrame) {
             cancelAnimationFrame(_dragOverFrame);
@@ -840,6 +840,7 @@
         const task = p.tasks.find(t => t.id === taskId);
         if (!task) return;
         const oldColId = task.columnId;
+        const previousState = p.tasks.map(t => ({ id: t.id, columnId: t.columnId, order: t.order }));
         task.columnId = colId;
         // Re-sort tasks in affected columns
         const colTasks = p.tasks.filter(t => t.columnId === colId && t.id !== taskId).sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -851,18 +852,28 @@
             mc.innerHTML = renderBoardView();
             bindBoardEvents();
         }
-        // Persist
+        // Both endpoints save the whole project; serialize them or stale writes
+        // can resurrect old column/order data and make drag feel stuck.
         const updates = p.tasks.map(t => ({ id: t.id, columnId: t.columnId, order: t.order || 0 }));
-        api.reorderTasks(p.id, updates).catch(() => toast('Сохранить failed', 'error'));
-        // Also update task's columnId via task update for activity log
-        if (oldColId !== colId) {
-            api.updateTask(p.id, taskId, { columnId: colId, order: task.order }).then(result => {
-                // Check if a score was awarded (task moved to Done)
+        try {
+            await api.reorderTasks(p.id, updates);
+            if (oldColId !== colId) {
+                const result = await api.updateTask(p.id, taskId, { columnId: colId, order: task.order });
                 if (result && result.task && result.task._scoreAwarded) {
                     animateTaskComplete(taskId, result.task._scoreAwarded);
                     populateBoardScoreboard();
                 }
-            }).catch(() => {});
+            }
+        } catch (err) {
+            previousState.forEach(snapshot => {
+                const current = p.tasks.find(t => t.id === snapshot.id);
+                if (current) { current.columnId = snapshot.columnId; current.order = snapshot.order; }
+            });
+            const rollback = getMainContent();
+            if (rollback) { rollback.innerHTML = renderBoardView(); bindBoardEvents(); }
+            toast('Не удалось сохранить перемещение. Доска восстановлена.', 'error');
+        }
+        if (oldColId !== colId) {
             // Check if target is a "done" column and show preview animation
             const targetCol = p.columns.find(c => c.id === colId);
             if (targetCol && ['done', 'completed', 'verified', 'published', 'fixed', 'closed'].includes(targetCol.title.toLowerCase())) {
@@ -934,26 +945,38 @@
         _touchActive = false;
     }
 
-    function simulateDrop(taskId, colId) {
+    async function simulateDrop(taskId, colId) {
         const p = state.currentProject;
         if (!p) return;
         const task = p.tasks.find(t => t.id === taskId);
         if (!task || task.columnId === colId) return;
         const oldColId = task.columnId;
+        const previousState = p.tasks.map(t => ({ id: t.id, columnId: t.columnId, order: t.order }));
         task.columnId = colId;
         const colTasks = p.tasks.filter(t => t.columnId === colId).sort((a, b) => (a.order || 0) - (b.order || 0));
         colTasks.forEach((t, i) => t.order = i);
         const mc = getMainContent();
         if (mc) { mc.innerHTML = renderBoardView(); bindBoardEvents(); }
         const updates = p.tasks.map(t => ({ id: t.id, columnId: t.columnId, order: t.order || 0 }));
-        api.reorderTasks(p.id, updates).catch(() => {});
-        if (oldColId !== colId) {
-            api.updateTask(p.id, taskId, { columnId: colId }).then(result => {
+        try {
+            await api.reorderTasks(p.id, updates);
+            if (oldColId !== colId) {
+                const result = await api.updateTask(p.id, taskId, { columnId: colId });
                 if (result && result.task && result.task._scoreAwarded) {
                     animateTaskComplete(taskId, result.task._scoreAwarded);
                     populateBoardScoreboard();
                 }
-            }).catch(() => {});
+            }
+        } catch (err) {
+            previousState.forEach(snapshot => {
+                const current = p.tasks.find(t => t.id === snapshot.id);
+                if (current) { current.columnId = snapshot.columnId; current.order = snapshot.order; }
+            });
+            const rollback = getMainContent();
+            if (rollback) { rollback.innerHTML = renderBoardView(); bindBoardEvents(); }
+            toast('Не удалось сохранить перемещение. Доска восстановлена.', 'error');
+        }
+        if (oldColId !== colId) {
             // Optimistic complete animation for done columns
             const targetCol = p.columns.find(c => c.id === colId);
             if (targetCol && ['done', 'completed', 'verified', 'published', 'fixed', 'closed'].includes(targetCol.title.toLowerCase())) {

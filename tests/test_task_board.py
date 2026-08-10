@@ -248,6 +248,26 @@ def test_handoff_dispatch_retry_ack_and_terminal_projection():
         assert projection["tasks"][0]["handoff"]["status"] == "completed"
 
 
+def test_board_move_changes_column_once_and_rejects_stale_version():
+    """Drag/drop moves are optimistic and never overwrite a newer card."""
+    source = (Path(__file__).resolve().parents[1] / "app" / "server.py").read_text()
+    function = next(node for node in ast.parse(source).body
+                    if isinstance(node, ast.FunctionDef) and node.name == "_handle_task_board_move")
+    projects = {"projects": [{"id": "p", "columns": [{"id": "todo"}, {"id": "doing"}],
+                              "tasks": [{"id": "t", "columnId": "todo", "version": 2}]}]}
+    saved = []
+    namespace = {"_load_projects": lambda: projects, "_save_projects": lambda data: saved.append(data),
+                 "_proj_now": lambda: "now"}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), str(Path(__file__)), "exec"), namespace)
+    moved = namespace["_handle_task_board_move"]("p", "t", {"columnId": "doing", "expectedVersion": 2})
+    assert moved["ok"] is True and moved["expectedVersion"] == 3
+    assert projects["projects"][0]["tasks"][0]["columnId"] == "doing"
+    assert len(saved) == 1
+    stale = namespace["_handle_task_board_move"]("p", "t", {"columnId": "todo", "expectedVersion": 2})
+    assert stale["_status"] == 409 and stale["code"] == "stale_version"
+    assert projects["projects"][0]["tasks"][0]["columnId"] == "doing"
+
+
 if __name__ == "__main__":
     test_assignment_round_trip_is_atomic_store_compatible()
     test_assignment_failure_removes_pending_outbox_record()
