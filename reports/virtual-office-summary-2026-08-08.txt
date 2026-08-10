@@ -1,0 +1,136 @@
+SMARTSLIMWAY VIRTUAL OFFICE
+Сводный отчёт — 8 августа 2026
+
+# Повторный отчёт о выполненной работе
+
+Дата: 2026-08-07 (GMT+7)
+Основание: повторная просьба пользователя после завершения основного отчёта.
+
+- Проверены Gateway, Tailscale Serve, офис, health и текущий GitHub state.
+- Подтверждено: Tailscale BackendState `Running`, офис `:8443/` и `:8443/health` отвечают HTTP 200.
+- Подтверждено: `/ws-gateway` на основном Serve listener ранее возвращал HTTP 502, а listener `:8443` содержит только `/`; прямой запрос к `:8443/ws-gateway` сейчас возвращает HTTP 404.
+- Найдена и исправлена ошибка клиента: при HTTPS он терял порт `8443`, потому что строил URL по `hostname`; теперь WebSocket URL сохраняет `window.location.port` и использует тот же origin/path.
+- Попытка добавить `/ws-gateway -> 8093` через Tailscale CLI остановлена безопасно: legacy-конфигурация не принимает новый `set-config` schema, а обычная команда отказала из-за существующего listener. Текущие рабочие маршруты не затронуты.
+- Пять технических блокеров сохранены в основной `MEMORY.md`.
+- Повторный и итоговый отчёты добавлены в репозиторий.
+
+Проверки и публикация указаны в итоговом отчёте после commit/push.
+
+
+============================================================
+
+# Итоговый отчёт
+
+Дата: 2026-08-07 (GMT+7)
+Проект: `my-virtual-office-free`
+
+## Результат
+
+Основная часть задачи выполнена и опубликована в GitHub. Русский toolbar после reload исправлен ранее; bubble controls объединены в одну toggle-кнопку; отчёты и рабочие ограничения зафиксированы; инструкции Worker/Designer и Memory дополнены подтверждёнными правилами.
+
+Дополнительно в этой итерации исправлена логика формирования WebSocket URL: при HTTPS клиент теперь сохраняет порт текущей страницы, включая `8443`, вместо молчаливого перехода на `443`.
+
+## Проверенный статус
+
+- GitHub remote: `https://github.com/Sena22555/my-virtual-office-free.git`
+- Последний опубликованный commit до этой итерации: `85d266e`
+- Локальный офис: health `{"ok": true, "status": "running"}`
+- Tailscale: `BackendState=Running`, tailnet-only
+- Офис: `https://mac-mini.tail4cdd3e.ts.net:8443/` -> HTTP 200
+- Офис health: `https://mac-mini.tail4cdd3e.ts.net:8443/health` -> HTTP 200
+- Текущий `/ws-gateway` на listener `:8443`: HTTP 404, потому что route на этом listener не добавлен; основной route ранее давал HTTP 502 при upgrade-тесте.
+
+## Пять сохранённых блокеров
+
+1. Protected Gateway model/workspace fields требуют штатного административного изменения.
+2. Designer image generation требует реально настроенного provider с `configured:true` и `selected:true`.
+3. Tailscale listener `:8443` требует безопасного добавления `/ws-gateway -> 127.0.0.1:8093`; существующая legacy-конфигурация не была перезаписана неподдерживаемым schema.
+4. Worker требует session/task tools для полноценного spawn/list/history/verification workflow.
+5. Telegram delivery требует подтверждения внешней отправки и target/chat_id; секреты не раскрываются.
+
+## Проверки
+
+- `node --check app/game.js` — OK.
+- `node --check app/chat.js` — OK после изменения URL.
+- `python3 -m py_compile app/server.py roster_server.py` — OK.
+- `git diff --check` — OK.
+- pytest packaging/auth — `1 passed`.
+
+## Файлы
+
+- `reports/work-completed-2026-08-07.md`
+- `reports/work-completed-2026-08-07-repeat.md`
+- `reports/required-tools-and-access-2026-08-07.md`
+- `reports/final-summary-2026-08-07.md`
+- основной `MEMORY.md` содержит пять блокеров.
+
+
+============================================================
+
+# Отчёт: необходимые инструменты и доступы
+
+Дата: 2026-08-07 (GMT+7)
+Проект: SmartSlimWay Virtual Office Free
+
+## 1. Для исправления моделей агентов
+
+Нужен штатный административный доступ к защищённой конфигурации Gateway, чтобы изменить только подтверждённые поля:
+
+- Main: оставить `a6api/gpt-5.6-luna`.
+- Memory: назначить зарегистрированную модель из `a6api`, например `a6api/gpt-5.6-luna`, без Terra.
+- Worker: назначить зарегистрированную модель из `a6api`, например `a6api/gpt-5.6-luna`, либо другой явно подтверждённый текстовый model ID.
+- Designer: назначить текстовую рабочую модель из `a6api` и отдельно настроить image backend; image input не считать генерацией.
+- Не добавлять несуществующие ссылки вида `a6api-memory/gpt-5.6-luna`, `a6api-designer/gpt-5.6-luna` или `a6api-worker/gpt-5.6-luna`, пока такие model IDs не зарегистрированы у provider.
+
+Ключи API не нужны в отчёте и не должны передаваться в workspace или чат. Достаточно административной операции Gateway через штатный config API/CLI.
+
+## 2. Для полноценной работы Worker
+
+Worker нужен доступ к:
+
+- `sessions_spawn` для запуска независимых дочерних веток;
+- `sessions_list` и/или эквиваленту для контроля активных и завершённых runs;
+- `sessions_history` или безопасному event stream для проверки результатов;
+- `sessions_yield` для ожидания обязательных веток;
+- read-only Gateway/task telemetry или локальному журналу workflow;
+- инструментам `exec/read/process` для verification gate.
+
+Доступ должен быть узким: Worker не получает права на удаление, Gateway restart, изменение OpenClaw config/scheduler/permissions, secret handling или внешние сообщения без явного подтверждения.
+
+## 3. Для Designer и web/image workflow
+
+Уже доступны:
+
+- `web_search` и `web_fetch`;
+- image capability-инструменты.
+
+Нужно настроить ровно один безопасный image-generation provider через штатный секретный механизм Gateway. Подходят только provider с фактическими признаками `configured:true` и `selected:true`. Возможные backend-классы: Gemini image, GPT Image, Flux/Krea/fal, Grok Imagine, ComfyUI; конкретный выбор зависит от имеющегося ключа и тарифа.
+
+Текущий DuckDuckGo search иногда возвращает bot-detection challenge; нужен надёжный configured search provider или fallback, а не выдача challenge за результат.
+
+## 4. Для бухгалтерских отчётов
+
+Нужен безопасный read-only источник worker telemetry с полями:
+
+`task_id`, `parent_task_id`, `attempt`, `run_id`, `session_id`, `executor`, `provider`, `model`, `status`, `started_at`, `finished_at`, `input_tokens`, `output_tokens`, `total_tokens`, `retry_of`, `error_code`, `error_message`, `evidence_ref`.
+
+Отчёт должен получать данные из первичных событий/логов/usage records и обозначать отсутствующие поля как `н/д`. Нельзя суммировать parent и child tokens, если parent total уже включает children.
+
+## 5. Для Telegram-доставки
+
+Gateway Telegram уже включён, но для первой доставки нужны:
+
+- подтверждение пользователя на внешнюю отправку;
+- целевой `chat_id` личного чата, группы или канала;
+- подтверждение, что пользователь открыл диалог с ботом;
+- для группы/канала: бот добавлен и имеет право отправлять документы/сообщения;
+- правило доставки: после worker cycle, вручную или по расписанию;
+- предпочтительный формат: два отдельных сообщения или два Markdown-файла.
+
+Bot token уже находится в конфигурации Gateway и не должен дублироваться в сообщениях, отчётах или GitHub.
+
+## Не требуется
+
+- Не требуется расширять Gateway bind на `0.0.0.0`.
+- Не требуется отключать auth или safeguards.
+- Не требуется менять Tailscale routes до диагностики причины `502` на `/ws-gateway`.

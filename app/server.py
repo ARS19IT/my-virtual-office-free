@@ -2145,8 +2145,10 @@ from providers.claude_code import ClaudeCodeProvider
 from providers.hermes import HermesApiClient, HermesDesktopBackendClient, discover_desktop_backend
 from license import get_license_status, activate_license, deactivate_license, check_feature, get_agent_limit
 from project_store import MarkdownProjectStore
+from task_board_outbox import TaskBoardOutbox
 
 PROJECT_STORE = MarkdownProjectStore(STATUS_DIR)
+TASK_BOARD_OUTBOX = TaskBoardOutbox(os.path.join(STATUS_DIR, "task-board-outbox.json"))
 
 
 AGENT_PLATFORM_COMM_SKILL_NAME = "AgentPlatform-to-AgentPlatform_Communications"
@@ -9590,6 +9592,211 @@ def _handle_projects_list(query_string=""):
     return {"ok": True, "projects": summaries}
 
 
+def _handle_task_board():
+    """GET /api/task-board — flattened, read-only task board projection."""
+    data = _load_projects()
+    cards = []
+    for project in data.get("projects", []):
+        columns = {c.get("id"): c for c in project.get("columns", [])}
+        for task in project.get("tasks", []):
+            checklist = task.get("checklist") if isinstance(task.get("checklist"), list) else []
+            done = sum(1 for item in checklist if isinstance(item, dict) and item.get("done"))
+            col = columns.get(task.get("columnId"), {})
+            cards.append({
+                "id": task.get("id"), "projectId": project.get("id"),
+                "projectTitle": project.get("title", ""), "title": task.get("title", ""),
+                "status": col.get("title", "Uncategorized"),
+                "statusId": task.get("columnId"), "assignee": task.get("assignee"),
+                "priority": task.get("priority", "medium"), "progress": {
+                    "done": done, "total": len(checklist),
+                    "percent": round(done / len(checklist) * 100) if checklist else 0,
+                }, "checkpoints": checklist, "updatedAt": task.get("updatedAt"),
+                "expectedVersion": task.get("version", 0),
+            })
+    handoffs = TASK_BOARD_OUTBOX.list()
+    # Keep terminal handoffs attached as well: the board is the durable view
+    # of the command result, not only a view of work still in flight.
+    by_task = {(h.get("projectId"), h.get("taskId")): h for h in handoffs
+               if h.get("projectId") and h.get("taskId")}
+    for card in cards:
+        handoff = by_task.get((card["projectId"], card["id"]))
+        if handoff:
+            card["handoff"] = handoff
+    return {"ok": True, "tasks": cards, "handoffs": handoffs, "generatedAt": _proj_now()}
+
+
+def _task_board_command_message(record):
+    """Stable worker envelope; the command id is the delivery idempotency key."""
+    return json.dumps({
+        "type": "task.reassign",
+        "project": record.get("projectId"),
+        "task": record.get("taskId"),
+        "from": record.get("from"),
+        "to": record.get("to"),
+        "actor": record.get("actor"),
+        "expectedVersion": record.get("expectedVersion"),
+        "idempotencyKey": record.get("idempotencyKey"),
+        "commandId": record.get("commandId"),
+    }, sort_keys=True)
+
+
+def _dispatch_task_board_handoff(record):
+    """Deliver a reassignment and notifications through the existing A2A seam."""
+    message = _task_board_command_message(record)
+    targets = []
+    for target, kind in ((record.get("to"), "new-assignee"), (record.get("from"), "old-assignee")):
+        if target and target not in [item[0] for item in targets]:
+            targets.append((target, kind))
+    if not targets:
+        return {"ok": True, "deliveries": []}
+    # Retries resume a partially delivered fan-out. A successful target is
+    # durable evidence and must not receive the same command twice.
+    previous = {item.get("target") for item in (record.get("deliveries") or [])
+                if item.get("ok") and item.get("target")}
+    deliveries = list(record.get("deliveries") or [])
+    for target, kind in targets:
+        if target in previous:
+            continue
+        result = _handle_agent_platform_comm_send({
+            "fromType": "human", "fromId": record.get("actor") or "task-board",
+            "fromDisplayName": "Task Board", "toAgentId": target,
+            "message": message, "conversationId": record.get("commandId"),
+            "metadata": {"commandId": record.get("commandId"), "handoff": kind},
+        })
+        delivery = {"target": target, "kind": kind, "ok": bool(result.get("ok")), "result": result}
+        deliveries.append(delivery)
+        if not result.get("ok"):
+            return {"ok": False, "deliveries": deliveries, "error": result.get("error") or result.get("reply") or "transport failed"}
+    return {"ok": True, "deliveries": deliveries}
+
+
+def _consume_task_board_outbox_once():
+    record = TASK_BOARD_OUTBOX.claim_pending()
+    if not record:
+        return None
+    try:
+        result = _dispatch_task_board_handoff(record)
+        if result.get("ok"):
+            return TASK_BOARD_OUTBOX.update(record["idempotencyKey"], status="completed", completedAt=time.time(), deliveries=result.get("deliveries", []), error=None)
+        attempts = int(record.get("attempts", 1))
+        delay = min(300, 2 ** min(attempts, 8))
+        return TASK_BOARD_OUTBOX.update(record["idempotencyKey"], status="failed", failedAt=time.time(), nextAttemptAt=time.time() + delay, error=result.get("error"), deliveries=result.get("deliveries", []))
+    except Exception as exc:
+        return TASK_BOARD_OUTBOX.update(record["idempotencyKey"], status="failed", failedAt=time.time(), nextAttemptAt=time.time() + 2, error=str(exc))
+
+
+def _task_board_dispatch_loop():
+    while True:
+        try:
+            _consume_task_board_outbox_once()
+        except Exception as exc:
+            print(f"[TASK BOARD] dispatcher error: {exc}")
+        time.sleep(1)
+
+
+def _handle_task_board_handoff(command_id):
+    for record in TASK_BOARD_OUTBOX.list():
+        if record.get("commandId") == command_id or record.get("idempotencyKey") == command_id:
+            return {"ok": True, "handoff": record}
+    return {"ok": False, "error": "Handoff not found", "_status": 404}
+
+
+def _handle_task_board_handoff_ack(command_id, body):
+    result = _handle_task_board_handoff(command_id)
+    if not result.get("ok"):
+        return result
+    record = result["handoff"]
+    status = str(body.get("status") or "completed")
+    if status not in {"completed", "failed"}:
+        return {"ok": False, "error": "status must be completed or failed", "_status": 400}
+    # A worker may retry an acknowledgement. Once terminal, the first result
+    # is authoritative: replay the same record and reject contradictory data.
+    current = record.get("status")
+    if current in {"completed", "failed"}:
+        if current != status:
+            return {"ok": False, "error": "terminal handoff status conflict",
+                    "code": "terminal_conflict", "_status": 409}
+        return {"ok": True, "handoff": record}
+    changes = {"status": status, "workerAckAt": time.time()}
+    # Do not erase an existing transport error/delivery detail on an ack that
+    # omits error; this keeps the operational record useful for retries.
+    if "error" in body:
+        changes["error"] = body.get("error")
+    return {"ok": True, "handoff": TASK_BOARD_OUTBOX.update(record["idempotencyKey"], **changes)}
+
+
+def _handle_task_board_assignment(project_id, task_id, body):
+    """Persist and apply an idempotent task reassignment."""
+    if "assignee" not in body:
+        return {"error": "assignee is required (use null to unassign)", "_status": 400}
+    key = str(body.get("idempotencyKey") or "").strip()
+    if not key:
+        return {"error": "Idempotency-Key is required", "_status": 400}
+    if not isinstance(body.get("expectedVersion"), int):
+        return {"error": "expectedVersion is required", "_status": 400}
+    assignee = body.get("assignee")
+    if assignee is not None and not isinstance(assignee, str):
+        return {"error": "assignee must be a string or null", "_status": 400}
+    request_payload = {k: v for k, v in body.items() if k != "idempotencyKey"}
+    request_hash = hashlib.sha256(json.dumps(
+        {"projectId": project_id, "taskId": task_id, "body": request_payload},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+    existing = TASK_BOARD_OUTBOX.lookup(key)
+    if existing:
+        if existing.get("requestHash") != request_hash:
+            return {"error": "Idempotency key was already used with a different payload", "code": "idempotency_conflict", "_status": 409}
+        if existing.get("status") not in {"pending", "active"}:
+            return {"ok": existing.get("status") == "completed", "status": existing.get("status"), "pending": False,
+                    "commandId": existing.get("commandId"), "handoff": existing}
+        replay = existing.get("response")
+        if isinstance(replay, dict):
+            return dict(replay)
+        return {"ok": True, "status": existing.get("status", "pending"), "pending": True, "handoff": existing}
+    data = _load_projects()
+    project = next((p for p in data.get("projects", []) if p.get("id") == project_id), None)
+    task = next((t for t in (project or {}).get("tasks", []) if t.get("id") == task_id), None)
+    if not project:
+        return {"error": "Project not found", "_status": 404}
+    if not task:
+        return {"error": "Task not found", "_status": 404}
+    version = task.get("version", 0)
+    if body["expectedVersion"] != version:
+        return {"error": "Task version is stale", "code": "stale_version", "expectedVersion": version, "_status": 409}
+    with _WORKFLOW_LOCK:
+        wf = _WORKFLOW_STATE.get(project_id)
+        if wf and wf.get("active") and wf.get("currentTaskId") == task_id:
+            return {"error": "Task handoff is active; stop the workflow first", "code": "active_conflict", "_status": 409}
+    # Validate before creating the durable command so rejected requests never
+    # appear as pending handoffs.
+    if assignee:
+        _refresh_discovery()
+        valid_ids = {str(a.get("id")) for a in _discovered_roster if a.get("id")}
+        valid_ids.update(str(a.get("statusKey")) for a in _discovered_roster if a.get("statusKey"))
+        if str(assignee) not in valid_ids:
+            return {"error": f"Unknown agent: {assignee}", "code": "unknown_agent", "_status": 422}
+    command_id = str(uuid.uuid4())
+    outbox_record = {
+        "commandId": command_id, "projectId": project_id, "taskId": task_id,
+        "from": task.get("assignee"), "to": assignee,
+        "actor": body.get("actor") or "task-board",
+        "idempotencyKey": key, "expectedVersion": version,
+        "requestHash": request_hash, "status": "pending",
+        "createdAt": time.time(),
+    }
+    try:
+        task["assignee"] = assignee
+        task["version"] = version + 1
+        task["updatedAt"] = _proj_now()
+        _save_projects(data)
+    except Exception as exc:
+        return {"error": f"Failed to persist assignment: {exc}", "code": "assignment_failed", "_status": 500}
+    record, _ = TASK_BOARD_OUTBOX.create(outbox_record)
+    response = {"ok": True, "commandId": command_id, "pending": True, "handoff": record,
+                "expectedVersion": version + 1, "task": task}
+    TASK_BOARD_OUTBOX.update(key, response=response)
+    return response
+
+
 def _handle_project_get(project_id):
     """GET /api/projects/{id} — return full project."""
     data = _load_projects()
@@ -14369,6 +14576,23 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             result.pop("_status", None)
             self.wfile.write(json.dumps(result).encode())
+        # ── TASK BOARD API ────────────────────────────────────────────
+        elif self.path == "/api/task-board":
+            result = _handle_task_board()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+        elif self.path.startswith("/api/task-board/handoffs/"):
+            command_id = self.path.split("/api/task-board/handoffs/")[1].strip("/")
+            result = _handle_task_board_handoff(command_id)
+            status = result.pop("_status", 200)
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
         # ── PROJECTS API ────────────────────────────────────────────
         elif self.path == "/api/projects" or self.path.startswith("/api/projects?"):
             qs = self.path.split("?", 1)[1] if "?" in self.path else ""
@@ -15382,8 +15606,28 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
     def do_PUT(self):
         length = int(self.headers.get('Content-Length', 0))
         body = json.loads(self.rfile.read(length)) if length else {}
+        # ── TASK BOARD PUT ──────────────────────────────────────────
+        if self.path.startswith("/api/task-board/tasks/"):
+            # PUT /api/task-board/tasks/{projectId}/{taskId}
+            rest = self.path.split("/api/task-board/tasks/")[1]
+            parts = rest.strip("/").split("/")
+            if len(parts) >= 2:
+                proj_id = urllib.parse.unquote(parts[0])
+                task_id = urllib.parse.unquote(parts[1])
+                idempotency_key = self.headers.get("Idempotency-Key", "").strip()
+                if idempotency_key:
+                    body["idempotencyKey"] = idempotency_key
+                result = _handle_task_board_assignment(proj_id, task_id, body)
+            else:
+                result = {"error": "Bad task-board path", "_status": 400}
+            self.send_response(result.get("_status", 200))
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            result.pop("_status", None)
+            self.wfile.write(json.dumps(result).encode())
         # ── PROJECTS PUT ─────────────────────────────────────────────
-        if self.path.startswith("/api/projects/") and self.path.endswith("/workflow/auto-mode"):
+        elif self.path.startswith("/api/projects/") and self.path.endswith("/workflow/auto-mode"):
             proj_id = self.path.split("/api/projects/")[1].rsplit("/workflow/auto-mode", 1)[0]
             result = _handle_workflow_auto_mode(proj_id, body)
             self.send_response(result.get("_status", 200))
@@ -15562,6 +15806,20 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+        # ── TASK BOARD POST ─────────────────────────────────────────
+        if self.path.startswith("/api/task-board/handoffs/") and self.path.endswith("/ack"):
+            # POST /api/task-board/handoffs/{commandId}/ack
+            length = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+            command_id = self.path.split("/api/task-board/handoffs/")[1].rsplit("/ack", 1)[0]
+            result = _handle_task_board_handoff_ack(command_id, body)
+            self.send_response(result.get("_status", 200))
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            result.pop("_status", None)
             self.wfile.write(json.dumps(result).encode())
             return
         # --- SETUP WIZARD ---
@@ -17566,6 +17824,10 @@ def main():
     # Auto-resume interrupted workflows (in background, after server starts)
     resume_thread = threading.Thread(target=_wf_auto_resume_on_startup, daemon=True, name="wf-auto-resume")
     resume_thread.start()
+
+    # Start task board outbox dispatcher
+    tb_thread = threading.Thread(target=_task_board_dispatch_loop, daemon=True, name="task-board-outbox")
+    tb_thread.start()
 
     # Start HTTP server in main thread
     start_http_server()

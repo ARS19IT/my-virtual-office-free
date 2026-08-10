@@ -3034,10 +3034,10 @@
   function getGatewayUrl() {
     const host = window.location.hostname || '127.0.0.1';
     if (window.location.protocol === 'https:') {
-      // Tailscale Serve exposes the office on 443 or 8443. Keep the WS on the
-      // same origin/path so the browser does not silently drop the office port.
-      const port = window.location.port ? `:${window.location.port}` : '';
-      return `wss://${host}${port}/ws-gateway`;
+      // Tailscale Serve exposes the office and WS proxy as paths on the default
+      // HTTPS origin. Do not carry an alternate office port (for example :8443)
+      // into the WS URL: that listener may only proxy the HTTP root.
+      return `wss://${host}/ws-gateway`;
     }
     return `ws://${host}:${_chatWsPort}`;
   }

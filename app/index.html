@@ -24,6 +24,7 @@
     </script>
     <link rel="stylesheet" href="style.css?v=20260723-layout-selection-resize-1">
     <link rel="stylesheet" href="projects.css?v=20260722-1">
+    <link rel="stylesheet" href="task-board.css?v=20260810-1">
     <link rel="stylesheet" href="ui-modern.css?v=20260723-layout-selection-resize-1">
     <link rel="stylesheet" href="ui-themes.css?v=20260722-14">
     <link rel="stylesheet" href="office-layouts.css?v=20260722-2">
@@ -196,6 +197,7 @@
                 <a href="/models.html" style="text-decoration:none"><button title="Model & Provider Settings">⚙️ Models</button></a>
                 <a href="/cron.html" style="text-decoration:none"><button title="Cron Job Manager">⏰ Cron</button></a>
                 <button title="Project Manager" onclick="openProjectsManager()">📋 Projects</button>
+                <button id="btn-task-board" title="Task Board" onclick="openTaskBoard()">🗂️ Tasks</button>
                 <button title="Reset canvas zoom" onclick="resetCamera()">🔍 Reset</button>
                 <button id="sms-toggle" title="SMS/Phone Panel">📞 SMS</button>
                 <button id="browser-toggle" title="Браузер агента (Neko)" class="browser-toggle-btn">🌐 Browser</button>
@@ -562,6 +564,12 @@
         </div>
     </div>
 
+    <div id="taskBoardPanel" class="task-board-panel hidden" aria-label="Task board">
+        <div class="task-board-header"><strong>🗂️ Task Board</strong><button type="button" onclick="closeTaskBoard()" aria-label="Close">&times;</button></div>
+        <div id="taskBoardError" class="task-board-error" role="alert"></div>
+        <div id="taskBoardContent" class="task-board-content"><div class="task-board-empty">Loading…</div></div>
+    </div>
+
     <!-- Завершить встречу Sub-Modal -->
     <div id="endMeetingModal" class="modal hidden">
         <div class="modal-content" style="max-width:480px;">
@@ -854,6 +862,7 @@
     <script src="office-layouts.js?v=20260723-place-only-1"></script>
     <script src="browser-panel.js?v=20260722-ui-perf-1"></script>
     <script src="projects.js?v=20260722-ui-perf-1"></script>
+    <script src="task-board.js?v=20260810-1"></script>
     <script>
     // Bio sections for agent modal
     let _bioCache = {};
