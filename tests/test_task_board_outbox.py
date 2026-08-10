@@ -70,7 +70,27 @@ def test_failed_records_wait_until_retry_time():
         assert outbox.claim_pending(now=20)["attempts"] == 1
 
 
+def test_terminal_states_are_not_reclaimed():
+    """Terminal states (completed, dead-letter) are never reclaimed by claim_pending, even with expired leases."""
+    with tempfile.TemporaryDirectory() as tmp:
+        outbox = TaskBoardOutbox(Path(tmp) / "outbox.json")
+        outbox.create({"idempotencyKey": "completed", "status": "completed", "completedAt": 100})
+        outbox.create({"idempotencyKey": "dead-letter", "status": "dead-letter", "failedAt": 100})
+        outbox.create({"idempotencyKey": "pending", "status": "pending"})
+        # Terminal records are not eligible for claiming.
+        claimed = outbox.claim_pending(now=200)
+        assert claimed is not None
+        assert claimed["idempotencyKey"] == "pending"
+        assert outbox.claim_pending(now=200) is None  # No more pending records.
+        # Terminal records remain unchanged.
+        assert outbox.lookup("completed")["status"] == "completed"
+        assert outbox.lookup("dead-letter")["status"] == "dead-letter"
+
+
 if __name__ == "__main__":
     test_idempotent_create_and_durable_update()
     test_remove_is_atomic_and_idempotent()
+    test_claim_reclaims_expired_and_increments_attempts()
+    test_failed_records_wait_until_retry_time()
+    test_terminal_states_are_not_reclaimed()
     print("task board outbox test passed")

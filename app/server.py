@@ -9644,7 +9644,8 @@ def _dispatch_task_board_handoff(record):
     """Deliver a reassignment and notifications through the existing A2A seam."""
     message = _task_board_command_message(record)
     targets = []
-    for target, kind in ((record.get("to"), "new-assignee"), (record.get("from"), "old-assignee")):
+    for raw_target, kind in ((record.get("to"), "new-assignee"), (record.get("from"), "old-assignee")):
+        target = str(raw_target).strip() if raw_target is not None else ""
         if target and target not in [item[0] for item in targets]:
             targets.append((target, kind))
     if not targets:
@@ -9665,15 +9666,26 @@ def _dispatch_task_board_handoff(record):
         })
         delivery = {"target": target, "kind": kind, "ok": bool(result.get("ok")), "result": result}
         deliveries.append(delivery)
+        # Persist each fan-out result before calling another agent. A lease
+        # recovery or process restart must be able to resume after this target
+        # without sending it the same command again.
+        TASK_BOARD_OUTBOX.update(record["idempotencyKey"], deliveries=deliveries)
         if not result.get("ok"):
             return {"ok": False, "deliveries": deliveries, "error": result.get("error") or result.get("reply") or "transport failed"}
     return {"ok": True, "deliveries": deliveries}
 
 
 def _consume_task_board_outbox_once():
-    record = TASK_BOARD_OUTBOX.claim_pending()
+    # Agent calls may take up to 600 seconds and a reassignment can fan out to
+    # two agents. Keep the lease longer than the whole synchronous delivery so
+    # the one-second poller cannot reclaim an in-flight command.
+    record = TASK_BOARD_OUTBOX.claim_pending(retry_after=1800)
     if not record:
         return None
+    if int(record.get("attempts", 0) or 0) > 5:
+        return TASK_BOARD_OUTBOX.update(
+            record["idempotencyKey"], status="dead-letter",
+            failedAt=time.time(), error=record.get("error") or "delivery retry limit exceeded")
     try:
         result = _dispatch_task_board_handoff(record)
         if result.get("ok"):
@@ -9735,8 +9747,9 @@ def _handle_task_board_assignment(project_id, task_id, body):
     if not isinstance(body.get("expectedVersion"), int):
         return {"error": "expectedVersion is required", "_status": 400}
     assignee = body.get("assignee")
-    if assignee is not None and not isinstance(assignee, str):
+    if assignee is not None and not isinstance(assignee, (str, int)):
         return {"error": "assignee must be a string or null", "_status": 400}
+    assignee = str(assignee).strip() if assignee is not None else None
     request_payload = {k: v for k, v in body.items() if k != "idempotencyKey"}
     request_hash = hashlib.sha256(json.dumps(
         {"projectId": project_id, "taskId": task_id, "body": request_payload},
@@ -9762,6 +9775,11 @@ def _handle_task_board_assignment(project_id, task_id, body):
     version = task.get("version", 0)
     if body["expectedVersion"] != version:
         return {"error": "Task version is stale", "code": "stale_version", "expectedVersion": version, "_status": 409}
+    current_assignee = task.get("assignee")
+    current_assignee = str(current_assignee).strip() if current_assignee is not None else None
+    if assignee == current_assignee:
+        return {"ok": True, "status": "unchanged", "pending": False,
+                "commandId": None, "expectedVersion": version, "task": task}
     with _WORKFLOW_LOCK:
         wf = _WORKFLOW_STATE.get(project_id)
         if wf and wf.get("active") and wf.get("currentTaskId") == task_id:

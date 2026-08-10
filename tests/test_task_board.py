@@ -44,8 +44,11 @@ def test_assignment_failure_removes_pending_outbox_record():
             raise OSError("simulated project persistence failure")
         namespace = {
             "TASK_BOARD_OUTBOX": outbox,
+            # Task has a current assignee so None != "agent-a" triggers the
+            # persistence path; a same-assignee request would short-circuit
+            # before reaching _save_projects.
             "_load_projects": lambda: {"projects": [{
-                "id": "project-1", "tasks": [{"id": "task-1", "version": 0, "assignee": None}],
+                "id": "project-1", "tasks": [{"id": "task-1", "version": 0, "assignee": "agent-a"}],
             }]},
             "_save_projects": _raise,
             "_handle_task_update": _raise,
@@ -60,6 +63,8 @@ def test_assignment_failure_removes_pending_outbox_record():
             "time": time,
         }
         exec(compile(ast.Module(body=[function], type_ignores=[]), str(Path(__file__)), "exec"), namespace)
+        # Unassign (None) from the current "agent-a" — different assignees,
+        # so the save path is reached and the simulated OSError fires.
         result = namespace["_handle_task_board_assignment"](
             "project-1",
             "task-1",
@@ -68,7 +73,119 @@ def test_assignment_failure_removes_pending_outbox_record():
 
         assert result["code"] == "assignment_failed"
         assert result["_status"] == 500
+        # The outbox record must not have been created when persistence failed.
         assert outbox.lookup("failure-key") is None
+
+
+def test_same_assignee_reassignment_returns_unchanged_no_outbox():
+    """Repeated assignment to the same assignee returns unchanged without creating an outbox record."""
+    with tempfile.TemporaryDirectory() as tmp:
+        outbox = TaskBoardOutbox(Path(tmp) / "outbox.json")
+        source = (Path(__file__).resolve().parents[1] / "app" / "server.py").read_text()
+        function = next(
+            node for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef) and node.name == "_handle_task_board_assignment"
+        )
+        namespace = {
+            "TASK_BOARD_OUTBOX": outbox,
+            "_load_projects": lambda: {"projects": [{
+                "id": "project-1", "tasks": [{"id": "task-1", "version": 3, "assignee": "agent-a"}],
+            }]},
+            "_save_projects": lambda data: None,
+            "_WORKFLOW_LOCK": threading.Lock(),
+            "_WORKFLOW_STATE": {},
+            "_proj_now": lambda: "2026-01-01T00:00:00+00:00",
+            "_refresh_discovery": lambda: None,
+            "_discovered_roster": [{"id": "agent-a"}],
+            "hashlib": hashlib,
+            "json": json,
+            "uuid": uuid,
+            "time": time,
+        }
+        exec(compile(ast.Module(body=[function], type_ignores=[]), str(Path(__file__)), "exec"), namespace)
+        result = namespace["_handle_task_board_assignment"](
+            "project-1",
+            "task-1",
+            {"assignee": "agent-a", "expectedVersion": 3, "idempotencyKey": "same-assignee-key"},
+        )
+
+        assert result["ok"] is True
+        assert result["status"] == "unchanged"
+        assert result["pending"] is False
+        assert result["commandId"] is None
+        assert result["expectedVersion"] == 3  # version unchanged
+        # No outbox record created when assignee is unchanged.
+        assert outbox.lookup("same-assignee-key") is None
+
+
+def test_partial_fan_out_skips_successful_targets_on_retry():
+    """When one target in a fan-out succeeds and another fails, retry sends only to the failed target."""
+    source = (Path(__file__).resolve().parents[1] / "app" / "server.py").read_text()
+    tree = ast.parse(source)
+    wanted = {"_dispatch_task_board_handoff", "_task_board_command_message"}
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in wanted]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        outbox = TaskBoardOutbox(Path(tmp) / "outbox.json")
+        sent = []
+
+        def fake_send(payload):
+            sent.append(payload)
+            target = payload["toAgentId"]
+            # agent-new succeeds; agent-old fails.
+            if target == "agent-old":
+                return {"ok": False, "error": "transport failure"}
+            return {"ok": True, "messageId": "m-" + target}
+
+        namespace = {
+            "TASK_BOARD_OUTBOX": outbox,
+            "_handle_agent_platform_comm_send": fake_send,
+            "json": json,
+        }
+        exec(compile(ast.Module(body=functions, type_ignores=[]), str(Path(__file__)), "exec"), namespace)
+
+        record = {
+            "type": "task.reassign", "projectId": "project-1", "taskId": "task-1",
+            "from": "agent-old", "to": "agent-new", "actor": "user",
+            "idempotencyKey": "partial-key", "commandId": "cmd-partial",
+        }
+        outbox.create(record)
+
+        # First dispatch: agent-new succeeds, agent-old fails.
+        result = namespace["_dispatch_task_board_handoff"](outbox.lookup("partial-key"))
+        assert result["ok"] is False
+        assert len(sent) == 2
+        assert sent[0]["toAgentId"] == "agent-new"
+        assert sent[1]["toAgentId"] == "agent-old"
+
+        # Record now has one successful delivery.
+        record_after_first = outbox.lookup("partial-key")
+        deliveries = record_after_first.get("deliveries", [])
+        assert len(deliveries) == 2
+        assert deliveries[0]["target"] == "agent-new" and deliveries[0]["ok"] is True
+        assert deliveries[1]["target"] == "agent-old" and deliveries[1]["ok"] is False
+
+        # Simulate retry: agent-old now succeeds.
+        def fake_send_retry(payload):
+            sent.append(payload)
+            return {"ok": True, "messageId": "m-" + payload["toAgentId"]}
+
+        namespace["_handle_agent_platform_comm_send"] = fake_send_retry
+        result_retry = namespace["_dispatch_task_board_handoff"](record_after_first)
+        assert result_retry["ok"] is True
+        # Only one new send: agent-old (agent-new was skipped).
+        assert len(sent) == 3
+        assert sent[2]["toAgentId"] == "agent-old"
+
+        # Final record has two successful deliveries.
+        record_final = outbox.lookup("partial-key")
+        deliveries_final = record_final.get("deliveries", [])
+        assert len(deliveries_final) == 3
+        # The first two deliveries remain (agent-new success, agent-old failure),
+        # and the third is the retry success for agent-old.
+        assert deliveries_final[0]["target"] == "agent-new" and deliveries_final[0]["ok"] is True
+        assert deliveries_final[1]["target"] == "agent-old" and deliveries_final[1]["ok"] is False
+        assert deliveries_final[2]["target"] == "agent-old" and deliveries_final[2]["ok"] is True
 
 
 def test_handoff_dispatch_retry_ack_and_terminal_projection():
