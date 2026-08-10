@@ -9655,6 +9655,12 @@ def _dispatch_task_board_handoff(record):
         target = str(raw_target).strip() if raw_target is not None else ""
         if target and target not in [item[0] for item in targets]:
             targets.append((target, kind))
+    # A legacy/self-reassignment must never be sent back to the same agent:
+    # numeric 2 and string "2" are the same roster identity.
+    normalized_from = str(record.get("from")).strip() if record.get("from") is not None else ""
+    normalized_to = str(record.get("to")).strip() if record.get("to") is not None else ""
+    if normalized_from and normalized_from == normalized_to:
+        return {"ok": True, "deliveries": list(record.get("deliveries") or []), "skipped": "self-reassignment"}
     if not targets:
         return {"ok": True, "deliveries": []}
     # Retries resume a partially delivered fan-out. A successful target is
@@ -9812,6 +9818,7 @@ def _handle_task_board_assignment(project_id, task_id, body):
         task["assignee"] = assignee
         task["version"] = version + 1
         task["updatedAt"] = _proj_now()
+        project["updatedAt"] = task["updatedAt"]
         _save_projects(data)
     except Exception as exc:
         return {"error": f"Failed to persist assignment: {exc}", "code": "assignment_failed", "_status": 500}

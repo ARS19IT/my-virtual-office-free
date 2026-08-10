@@ -118,6 +118,22 @@ def test_same_assignee_reassignment_returns_unchanged_no_outbox():
         assert outbox.lookup("same-assignee-key") is None
 
 
+def test_self_reassignment_is_skipped_after_type_normalization():
+    source = (Path(__file__).resolve().parents[1] / "app" / "server.py").read_text()
+    function = next(node for node in ast.parse(source).body
+                    if isinstance(node, ast.FunctionDef) and node.name == "_dispatch_task_board_handoff")
+    with tempfile.TemporaryDirectory() as tmp:
+        outbox = TaskBoardOutbox(Path(tmp) / "outbox.json")
+        sent = []
+        namespace = {"TASK_BOARD_OUTBOX": outbox, "_handle_agent_platform_comm_send": lambda p: sent.append(p), "_task_board_command_message": lambda r: "test", "json": json}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), str(Path(__file__)), "exec"), namespace)
+        record = {"from": 2, "to": "2", "idempotencyKey": "self", "commandId": "cmd"}
+        outbox.create(record)
+        result = namespace["_dispatch_task_board_handoff"](record)
+        assert result["ok"] is True and result["skipped"] == "self-reassignment"
+        assert sent == []
+
+
 def test_partial_fan_out_skips_successful_targets_on_retry():
     """When one target in a fan-out succeeds and another fails, retry sends only to the failed target."""
     source = (Path(__file__).resolve().parents[1] / "app" / "server.py").read_text()
