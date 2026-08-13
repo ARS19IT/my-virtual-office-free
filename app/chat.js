@@ -144,6 +144,11 @@
       this.contextWindow = 0;
       this.contextUsed = 0;
       this.pendingAttachments = [];
+      // A single user gesture must create at most one provider request.  The
+      // send button is not disabled for the async OpenClaw/provider paths, so
+      // a double-click (or Enter followed by click) could otherwise generate
+      // two distinct idempotency keys and two deliveries.
+      this.sendInFlight = false;
       this.isRecording = false;
       this.mediaRecorder = null;
       this.audioChunks = [];
@@ -1142,7 +1147,8 @@
     async sendMessage() {
       let text = this.input.value.trim();
       const hasAttachments = this.pendingAttachments.length > 0;
-      if ((!text && !hasAttachments) || (!connected && !this.isHermesSelected() && !this.isCodexSelected() && !this.isClaudeCodeSelected())) return;
+      if (this.sendInFlight || (!text && !hasAttachments) || (!connected && !this.isHermesSelected() && !this.isCodexSelected() && !this.isClaudeCodeSelected())) return;
+      this.sendInFlight = true;
 
       this.input.value = '';
       this.input.style.height = 'auto';
@@ -1275,6 +1281,8 @@
           this.finishHermesProgress(hermesProgress, false, e.message);
           this.appendSystem('Hermes send failed: ' + e.message);
           this.setStatus('Hermes error', 'disconnected');
+        } finally {
+          this.sendInFlight = false;
         }
         return;
       }
@@ -1322,6 +1330,8 @@
           await this.loadHistory({ recoverFinal: true, startedAt: codexSendStartedAt }).catch(() => {});
           this.appendSystem('Codex send failed: ' + e.message);
           this.setStatus('Codex error', 'disconnected');
+        } finally {
+          this.sendInFlight = false;
         }
         return;
       }
@@ -1368,6 +1378,8 @@
           await this.loadHistory({ recoverFinal: true, startedAt: claudeSendStartedAt }).catch(() => {});
           this.appendSystem('Claude Code send failed: ' + e.message);
           this.setStatus('Claude Code error', 'disconnected');
+        } finally {
+          this.sendInFlight = false;
         }
         return;
       }
@@ -1380,7 +1392,8 @@
           this.ensureRecoveryWatchdog();
           runOwners.set(res.payload.runId, { slotId: this.slotId, sessionKey: sendSessionKey });
         }
-      }).catch(e => this.appendSystem('Failed to send: ' + e.message));
+      }).catch(e => this.appendSystem('Failed to send: ' + e.message))
+        .finally(() => { this.sendInFlight = false; });
     }
 
     async sendStop() {
