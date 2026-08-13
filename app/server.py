@@ -2416,15 +2416,22 @@ def _office_config_agent_override(agent_key):
 # used BRANCH_1/BRANCH_2/CEO (and occasionally the UI labels "first/second
 # branch").  Treat those as migration aliases, not as user-created groups.
 _CANONICAL_BRANCHES = [
-    {"id": "HQ", "name": "Office Manager", "emoji": "⚡", "theme": "branch-gold"},
-    {"id": "PQ", "name": "Pro Quality Plumbing", "emoji": "🔧", "theme": "branch-blue"},
-    {"id": "ENG", "name": "Caltran Engineering", "emoji": "🏗️", "theme": "branch-orange"},
-    {"id": "GEN", "name": "General Office", "emoji": "🌐", "theme": "branch-cyan"},
-    {"id": "BIZ", "name": "Business", "emoji": "🔥", "theme": "branch-red"},
+    {"id": "CEO", "name": "CEO", "emoji": "🏢", "theme": "branch-orange"},
+    {"id": "MAIN_TEAM", "name": "Основная команда", "emoji": "👥", "theme": "branch-blue"},
+    {"id": "OPS_TEAM", "name": "Операционная команда", "emoji": "⚙️", "theme": "branch-cyan"},
 ]
 _CANONICAL_AGENT_BRANCHES = {
-    "main": "HQ", "2": "PQ", "team": "ENG", "dising": "GEN",
-    "memory": "BIZ", "worker": "BIZ", "designer": "ENG",
+    "main": "CEO", "2": "MAIN_TEAM", "team": "MAIN_TEAM", "dising": "MAIN_TEAM",
+    "memory": "OPS_TEAM", "worker": "OPS_TEAM", "designer": "OPS_TEAM",
+}
+_CANONICAL_AGENT_METADATA = {
+    "main": {"name": "Кентик", "role": "Босс"},
+    "2": {"name": "Сэм", "role": "аналитик"},
+    "team": {"name": "Ден", "role": "разработчик"},
+    "dising": {"name": "Бухгалтер", "role": "бухгалтер"},
+    "memory": {"name": "Memory", "role": "Memory"},
+    "worker": {"name": "Worker", "role": "Worker"},
+    "designer": {"name": "Designer", "role": "Designer"},
 }
 _LEGACY_BRANCH_IDS = {"BRANCH_1", "BRANCH_2", "CEO", "first", "second", "первая ветка", "вторая ветка"}
 
@@ -2435,9 +2442,9 @@ def _canonicalize_office_config(cfg, *, preserve_layout=True):
         cfg = {}
     canonical_ids = {item["id"] for item in _CANONICAL_BRANCHES}
     old_branches = cfg.get("branches") if isinstance(cfg.get("branches"), list) else []
-    # Keep explicitly created modern groups, but never expose legacy/demo names.
-    modern = [b for b in old_branches if isinstance(b, dict) and str(b.get("id")) in canonical_ids]
-    cfg["branches"] = modern or [dict(b) for b in _CANONICAL_BRANCHES]
+    # The roster is a fixed product contract; discard stale/demo branch metadata
+    # but leave every layout/furniture field untouched.
+    cfg["branches"] = [dict(b) for b in _CANONICAL_BRANCHES]
     by_key = {}
     for item in cfg.get("agents") if isinstance(cfg.get("agents"), list) else []:
         if isinstance(item, dict):
@@ -2446,18 +2453,21 @@ def _canonicalize_office_config(cfg, *, preserve_layout=True):
                 by_key[key] = item
     for key, branch in _CANONICAL_AGENT_BRANCHES.items():
         item = by_key.get(key)
-        if item is not None and (not item.get("branch") or item.get("branch") == "UNASSIGNED" or item.get("branch") in _LEGACY_BRANCH_IDS):
+        if item is not None:
             item["branch"] = branch
+            item.update(_CANONICAL_AGENT_METADATA[key])
     cfg["agents"] = list(by_key.values()) if by_key else cfg.get("agents", [])
     return cfg
 
 
 def _load_office_config():
-    """Load persisted office state, migrating legacy metadata in memory."""
+    """Load persisted office state and persist canonical metadata in place."""
     path = os.path.join(STATUS_DIR, "office-config.json")
+    persisted = False
     try:
         with open(path, "r") as f:
             cfg = json.load(f)
+        persisted = True
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         cfg = {}
     if not cfg:
@@ -2466,7 +2476,24 @@ def _load_office_config():
                 cfg = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             cfg = {}
-    return _canonicalize_office_config(cfg)
+    canonical = _canonicalize_office_config(cfg)
+    if persisted and canonical != cfg:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = f"{path}.canonical.{os.getpid()}.{threading.get_ident()}"
+            with open(tmp, "w") as f:
+                json.dump(canonical, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+            os.chmod(path, 0o666)
+        except OSError:
+            try:
+                if os.path.exists(tmp):
+                    os.unlink(tmp)
+            except OSError:
+                pass
+    return canonical
 
 
 def _update_office_config_agent(agent_key, patch):
@@ -3275,12 +3302,12 @@ def _patch_default_config_agents(config_str):
         gender = 'F' if (h >> 2) % 2 == 0 else 'M'
         patched_agents.append({
             "id": agent_id,
-            "name": name,
-            "role": a.get("role", "AI assistant"),
+            "name": _CANONICAL_AGENT_METADATA.get(agent_id, {}).get("name", name),
+            "role": _CANONICAL_AGENT_METADATA.get(agent_id, {}).get("role", a.get("role", "AI assistant")),
             "emoji": a.get("emoji", "🤖"),
             "color": _AGENT_COLORS_LIST[len(patched_agents) % len(_AGENT_COLORS_LIST)] if len(patched_agents) < len(_AGENT_COLORS_LIST) else '#607d8b',
             "gender": gender,
-            "branch": "UNASSIGNED",
+            "branch": _CANONICAL_AGENT_BRANCHES.get(agent_id, "UNASSIGNED"),
             "statusKey": agent_id,
             "appearance": {
                 "skinTone": skin_tones[h % len(skin_tones)],

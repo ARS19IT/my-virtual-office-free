@@ -623,24 +623,24 @@
   ],
   "branches": [
     {
-      "id": "BRANCH_1",
-      "name": "Branch #1",
-      "emoji": "🏢",
-      "theme": "branch-gold",
-      "color": "#427bff"
-    },
-    {
-      "id": "BRANCH_2",
-      "name": "Branch #2",
-      "emoji": "🏢",
-      "theme": "branch-blue",
-      "color": "#ff6600"
-    },
-    {
       "id": "CEO",
       "name": "CEO",
       "emoji": "🏢",
       "theme": "branch-orange"
+    },
+    {
+      "id": "MAIN_TEAM",
+      "name": "Основная команда",
+      "emoji": "👥",
+      "theme": "branch-blue",
+      "color": "#427bff"
+    },
+    {
+      "id": "OPS_TEAM",
+      "name": "Операционная команда",
+      "emoji": "⚙️",
+      "theme": "branch-cyan",
+      "color": "#00a7b8"
     }
   ],
   "agents": [
@@ -674,11 +674,11 @@
     {
       "id": "2",
       "name": "Сэм",
-      "role": "ИИ-аналитик и командный напарник",
+      "role": "аналитик",
       "emoji": "🔎",
       "color": "#d32f2f",
       "gender": "M",
-      "branch": "BRANCH_1",
+      "branch": "MAIN_TEAM",
       "statusKey": "2",
       "appearance": {
         "skinTone": "#c68642",
@@ -701,11 +701,11 @@
     {
       "id": "team",
       "name": "Ден",
-      "role": "AI-разработчик и технический напарник",
+      "role": "разработчик",
       "emoji": "🛠️",
       "color": "#1976d2",
       "gender": "M",
-      "branch": "BRANCH_1",
+      "branch": "MAIN_TEAM",
       "statusKey": "team",
       "appearance": {
         "skinTone": "#f5d0b0",
@@ -728,11 +728,11 @@
     {
       "id": "dising",
       "name": "Бухгалтер",
-      "role": "",
+      "role": "бухгалтер",
       "emoji": "📐",
       "color": "#388e3c",
       "gender": "M",
-      "branch": "BRANCH_1",
+      "branch": "MAIN_TEAM",
       "statusKey": "dising",
       "appearance": {
         "skinTone": "#d4a574",
@@ -755,11 +755,11 @@
     {
       "id": "memory",
       "name": "Memory",
-      "role": "хранитель памяти команды",
+      "role": "Memory",
       "emoji": "🧠",
       "color": "#6a1b9a",
       "gender": "M",
-      "branch": "BRANCH_2",
+      "branch": "OPS_TEAM",
       "statusKey": "memory",
       "appearance": {
         "skinTone": "#f5d0b0",
@@ -782,11 +782,11 @@
     {
       "id": "worker",
       "name": "Worker",
-      "role": "диспетчер и наблюдатель команды",
+      "role": "Worker",
       "emoji": "🛠️",
       "color": "#00838f",
       "gender": "M",
-      "branch": "BRANCH_2",
+      "branch": "OPS_TEAM",
       "statusKey": "worker",
       "appearance": {
         "skinTone": "#c68642",
@@ -809,11 +809,11 @@
     {
       "id": "designer",
       "name": "Designer",
-      "role": "визуальный арт-директор команды",
+      "role": "Designer",
       "emoji": "🎨",
       "color": "#ad1457",
       "gender": "M",
-      "branch": "BRANCH_2",
+      "branch": "OPS_TEAM",
       "statusKey": "designer",
       "appearance": {
         "skinTone": "#d4a574",

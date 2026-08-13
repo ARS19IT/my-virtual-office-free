@@ -21,8 +21,10 @@ class OfficeConfigMigrationTests(unittest.TestCase):
             "agents": [{"id": "2", "branch": "UNASSIGNED"}, {"id": "main", "branch": "CEO"}],
         }
         migrated = server._canonicalize_office_config(cfg)
-        self.assertEqual([b["id"] for b in migrated["branches"]], ["HQ", "PQ", "ENG", "GEN", "BIZ"])
-        self.assertEqual({a["id"]: a["branch"] for a in migrated["agents"]}, {"2": "PQ", "main": "HQ"})
+        self.assertEqual([b["id"] for b in migrated["branches"]], ["CEO", "MAIN_TEAM", "OPS_TEAM"])
+        self.assertEqual({a["id"]: a["branch"] for a in migrated["agents"]}, {"2": "MAIN_TEAM", "main": "CEO"})
+        self.assertEqual({a["id"]: a["name"] for a in migrated["agents"]}, {"2": "Сэм", "main": "Кентик"})
+        self.assertEqual({a["id"]: a["role"] for a in migrated["agents"]}, {"2": "аналитик", "main": "Босс"})
         self.assertEqual(migrated["furniture"][0]["id"], "kept")
 
     def test_load_reads_persisted_layout_without_legacy_metadata(self):
@@ -34,8 +36,22 @@ class OfficeConfigMigrationTests(unittest.TestCase):
                 loaded = server._load_office_config()
             self.assertEqual(loaded["canvasWidth"], 1234)
             self.assertEqual(loaded["furniture"][0]["id"], "user-desk")
-            self.assertEqual(loaded["agents"][0]["branch"], "ENG")
+            self.assertEqual(loaded["agents"][0]["branch"], "MAIN_TEAM")
             self.assertNotIn("BRANCH_1", [b["id"] for b in loaded["branches"]])
+
+    def test_canonical_roster_metadata_for_all_seven_agents(self):
+        cfg = {"agents": [{"id": key} for key in ("main", "2", "team", "dising", "memory", "worker", "designer")]}
+        migrated = server._canonicalize_office_config(cfg)
+        actual = {a["id"]: (a["name"], a["role"], a["branch"]) for a in migrated["agents"]}
+        self.assertEqual(actual, {
+            "main": ("Кентик", "Босс", "CEO"),
+            "2": ("Сэм", "аналитик", "MAIN_TEAM"),
+            "team": ("Ден", "разработчик", "MAIN_TEAM"),
+            "dising": ("Бухгалтер", "бухгалтер", "MAIN_TEAM"),
+            "memory": ("Memory", "Memory", "OPS_TEAM"),
+            "worker": ("Worker", "Worker", "OPS_TEAM"),
+            "designer": ("Designer", "Designer", "OPS_TEAM"),
+        })
 
     class _patch_status_dir:
         def __init__(self, value):
