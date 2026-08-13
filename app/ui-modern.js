@@ -98,8 +98,10 @@
         var undoBtn = document.getElementById('btn-undo-edit');
         var projectBtn = toolbar.querySelector('button[onclick*="openProjectsManager"]');
         var resetBtn = toolbar.querySelector('button[onclick*="resetCamera"]');
-        var expandBtn = document.getElementById('btn-expand-all');
-        var minimizeBtn = document.getElementById('btn-minimize-all');
+        // Bubble controls were consolidated into one toggle button. Keep the
+        // modern toolbar enhancement aligned with the current markup so the
+        // control is not dropped when the toolbar is rebuilt on page load.
+        var bubbleToggleBtn = document.getElementById('btn-toggle-all');
         var smsBtn = document.getElementById('sms-toggle');
         var browserBtn = document.getElementById('browser-toggle');
         var links = toolbar.querySelectorAll(':scope > a');
@@ -110,8 +112,7 @@
         if (editBtn) editBtn.textContent = '✏️ Офис';
         if (agentBtn) agentBtn.textContent = '👥 Агенты';
         if (projectBtn) projectBtn.textContent = '📋 Проекты';
-        if (expandBtn) expandBtn.textContent = '💬 Развернуть';
-        if (minimizeBtn) minimizeBtn.textContent = '🗨️ Свернуть';
+        if (bubbleToggleBtn) bubbleToggleBtn.textContent = '💬 Свернуть';
         if (resetBtn) resetBtn.textContent = '🔍 Сбросить вид';
         if (smsBtn) smsBtn.textContent = '📞 СМС';
         if (browserBtn) browserBtn.textContent = '🌐 Браузер';
@@ -127,8 +128,7 @@
             [cronLink && cronLink.querySelector('button'), '⏰ Расписание'],
             [browserBtn, '🌐 Браузер'],
             [smsBtn, '📞 СМС'],
-            [expandBtn, '💬 Развернуть'],
-            [minimizeBtn, '🗨️ Свернуть'],
+            [bubbleToggleBtn, '💬 Свернуть'],
             [resetBtn, '🔍 Сбросить вид']
         ].forEach(function (entry) {
             if (!entry[0]) return;
@@ -175,7 +175,7 @@
         themeBtn.id = 'btn-ui-theme';
         themeBtn.type = 'button';
         themeBtn.addEventListener('click', toggleTheme);
-        [settingsBtn, editBtn, agentBtn, projectBtn, modelsLink, cronLink, browserBtn, smsBtn, expandBtn, minimizeBtn, resetBtn, themeBtn].forEach(function (el) {
+        [settingsBtn, editBtn, agentBtn, projectBtn, modelsLink, cronLink, browserBtn, smsBtn, bubbleToggleBtn, resetBtn, themeBtn].forEach(function (el) {
             if (el) primary.appendChild(el);
         });
 

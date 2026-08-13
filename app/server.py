@@ -2405,25 +2405,73 @@ def _agent_score_info(agent_key):
 
 
 def _office_config_agent_override(agent_key):
-    path = os.path.join(STATUS_DIR, "office-config.json")
-    try:
-        with open(path, "r") as f:
-            cfg = json.load(f)
-    except Exception:
-        return {}
+    cfg = _load_office_config()
     for item in cfg.get("agents", []) or []:
         if agent_key in (item.get("id"), item.get("statusKey")):
             return item
     return {}
 
 
-def _update_office_config_agent(agent_key, patch):
+# These are the stable Free Fork office groups.  Older persisted snapshots
+# used BRANCH_1/BRANCH_2/CEO (and occasionally the UI labels "first/second
+# branch").  Treat those as migration aliases, not as user-created groups.
+_CANONICAL_BRANCHES = [
+    {"id": "HQ", "name": "Office Manager", "emoji": "⚡", "theme": "branch-gold"},
+    {"id": "PQ", "name": "Pro Quality Plumbing", "emoji": "🔧", "theme": "branch-blue"},
+    {"id": "ENG", "name": "Caltran Engineering", "emoji": "🏗️", "theme": "branch-orange"},
+    {"id": "GEN", "name": "General Office", "emoji": "🌐", "theme": "branch-cyan"},
+    {"id": "BIZ", "name": "Business", "emoji": "🔥", "theme": "branch-red"},
+]
+_CANONICAL_AGENT_BRANCHES = {
+    "main": "HQ", "2": "PQ", "team": "ENG", "dising": "GEN",
+    "memory": "BIZ", "worker": "BIZ", "designer": "ENG",
+}
+_LEGACY_BRANCH_IDS = {"BRANCH_1", "BRANCH_2", "CEO", "first", "second", "первая ветка", "вторая ветка"}
+
+
+def _canonicalize_office_config(cfg, *, preserve_layout=True):
+    """Repair legacy branch metadata without replacing the user's layout."""
+    if not isinstance(cfg, dict):
+        cfg = {}
+    canonical_ids = {item["id"] for item in _CANONICAL_BRANCHES}
+    old_branches = cfg.get("branches") if isinstance(cfg.get("branches"), list) else []
+    # Keep explicitly created modern groups, but never expose legacy/demo names.
+    modern = [b for b in old_branches if isinstance(b, dict) and str(b.get("id")) in canonical_ids]
+    cfg["branches"] = modern or [dict(b) for b in _CANONICAL_BRANCHES]
+    by_key = {}
+    for item in cfg.get("agents") if isinstance(cfg.get("agents"), list) else []:
+        if isinstance(item, dict):
+            key = str(item.get("statusKey") or item.get("id") or "")
+            if key:
+                by_key[key] = item
+    for key, branch in _CANONICAL_AGENT_BRANCHES.items():
+        item = by_key.get(key)
+        if item is not None and (not item.get("branch") or item.get("branch") == "UNASSIGNED" or item.get("branch") in _LEGACY_BRANCH_IDS):
+            item["branch"] = branch
+    cfg["agents"] = list(by_key.values()) if by_key else cfg.get("agents", [])
+    return cfg
+
+
+def _load_office_config():
+    """Load persisted office state, migrating legacy metadata in memory."""
     path = os.path.join(STATUS_DIR, "office-config.json")
     try:
         with open(path, "r") as f:
             cfg = json.load(f)
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
         cfg = {}
+    if not cfg:
+        try:
+            with open(os.path.join(APP_DIR, "default-office-config.json"), "r") as f:
+                cfg = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            cfg = {}
+    return _canonicalize_office_config(cfg)
+
+
+def _update_office_config_agent(agent_key, patch):
+    path = os.path.join(STATUS_DIR, "office-config.json")
+    cfg = _load_office_config()
     agents = cfg.setdefault("agents", [])
     item = None
     for candidate in agents:
@@ -14191,6 +14239,7 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
                     "name": override.get("name") or a["name"],
                     "emoji": override.get("emoji") or a["emoji"],
                     "role": override.get("role") or a.get("role", ""),
+                    "branch": override.get("branch") or _CANONICAL_AGENT_BRANCHES.get(str(a.get("statusKey") or a.get("id")), "UNASSIGNED"),
                     "model": a.get("model", ""),
                     "provider": a.get("provider", ""),
                     "lastActiveAt": a.get("lastActiveAt", 0),
@@ -14428,7 +14477,8 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
             _oc_path = os.path.join(STATUS_DIR, "office-config.json")
             try:
                 with open(_oc_path, "r") as f:
-                    data = f.read()
+                    parsed = _canonicalize_office_config(json.load(f))
+                    data = json.dumps(parsed, ensure_ascii=False)
                 try:
                     parsed = json.loads(data or "{}")
                 except Exception:
@@ -16014,13 +16064,23 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(length) if length else b'{}'
             # Validate JSON
             try:
-                json.loads(body)
+                incoming = json.loads(body)
             except json.JSONDecodeError:
                 self.send_response(400)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"error":"Invalid JSON"}')
                 return
+            # A stale browser snapshot must not erase valid assignments. Merge
+            # only missing/UNASSIGNED branch values from the current state.
+            incoming = _canonicalize_office_config(incoming)
+            current = _load_office_config()
+            current_agents = {str(a.get("statusKey") or a.get("id")): a for a in current.get("agents", []) if isinstance(a, dict)}
+            for item in incoming.get("agents", []) if isinstance(incoming.get("agents"), list) else []:
+                key = str(item.get("statusKey") or item.get("id") or "")
+                if key and (not item.get("branch") or item.get("branch") == "UNASSIGNED") and key in current_agents:
+                    item["branch"] = current_agents[key].get("branch") or _CANONICAL_AGENT_BRANCHES.get(key, "UNASSIGNED")
+            body = json.dumps(incoming, ensure_ascii=False).encode("utf-8")
             _oc_path = os.path.join(STATUS_DIR, "office-config.json")
             # Never truncate the last good layout in place: a process/container
             # crash during write must leave a valid config to recover from.
