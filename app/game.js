@@ -128,11 +128,9 @@ var W = _officeConfig.canvasWidth;
 var H = _officeConfig.canvasHeight;
 
 const DEFAULT_BRANCHES = [
-    { id: 'HQ', name: 'Office Manager', emoji: '⚡', theme: 'branch-gold' },
-    { id: 'PQ', name: 'Pro Quality Plumbing', emoji: '🔧', theme: 'branch-blue' },
-    { id: 'ENG', name: 'Caltran Engineering', emoji: '🏗️', theme: 'branch-orange' },
-    { id: 'GEN', name: 'General Office', emoji: '🌐', theme: 'branch-cyan' },
-    { id: 'BIZ', name: 'Business', emoji: '🔥', theme: 'branch-red' }
+    { id: 'CEO', name: 'CEO', emoji: '🏢', theme: 'branch-orange' },
+    { id: 'MAIN_TEAM', name: 'Основная команда', emoji: '👥', theme: 'branch-blue' },
+    { id: 'OPS_TEAM', name: 'Операционная команда', emoji: '⚙️', theme: 'branch-cyan' }
 ];
 const UNASSIGNED_BRANCH = { id: 'UNASSIGNED', name: 'Unassigned', emoji: '❓', theme: 'branch-gray' };
 
@@ -2190,8 +2188,18 @@ function _buildAgentDefs(apiAgents) {
     savedAgents.forEach(function(s) { savedMap[s.id] = s; });
 
     var defs = [];
+    var canonical = {
+        main: { name: 'Кентик', role: 'Босс', branch: 'CEO' },
+        '2': { name: 'Сэм', role: 'аналитик', branch: 'MAIN_TEAM' },
+        team: { name: 'Ден', role: 'разработчик', branch: 'MAIN_TEAM' },
+        dising: { name: 'Бухгалтер', role: 'бухгалтер', branch: 'MAIN_TEAM' },
+        memory: { name: 'Memory', role: 'Memory', branch: 'OPS_TEAM' },
+        worker: { name: 'Worker', role: 'Worker', branch: 'OPS_TEAM' },
+        designer: { name: 'Designer', role: 'Designer', branch: 'OPS_TEAM' }
+    };
     apiAgents.forEach(function(a, idx) {
         var saved = savedMap[a.id] || savedMap[a.statusKey] || {};
+        var contract = canonical[a.statusKey || a.id] || {};
         defs.push({
             id: a.statusKey || a.id,
             statusKey: a.statusKey || a.id,
@@ -2199,10 +2207,10 @@ function _buildAgentDefs(apiAgents) {
             providerType: a.providerType || 'runtime',
             providerAgentId: a.providerAgentId || a.id,
             provider: a.provider || '',
-            name: saved.name || a.name || a.id,
+            name: contract.name || saved.name || a.name || a.id,
             emoji: saved.emoji || a.emoji || '🤖',
-            role: saved.role || a.role || '',
-            branch: saved.branch || 'UNASSIGNED',
+            role: contract.role || saved.role || a.role || '',
+            branch: contract.branch || saved.branch || a.branch || 'UNASSIGNED',
             color: saved.color || _AGENT_COLORS[idx % _AGENT_COLORS.length],
             gender: saved.gender || (idx % 2 === 0 ? 'M' : 'F'),
         });
@@ -2708,7 +2716,7 @@ class Agent {
             this.desk = LOCATIONS.centerDesk3;
         } else if (this.deskType === 'forge' && LOCATIONS.forgeDesk) {
             this.desk = LOCATIONS.forgeDesk;
-        } else if (this.branch === 'PQ' && LOCATIONS.pqDesks && LOCATIONS.pqDesks[this.deskIdx]) {
+        } else if (this.branch === 'MAIN_TEAM' && LOCATIONS.pqDesks && LOCATIONS.pqDesks[this.deskIdx]) {
             this.desk = LOCATIONS.pqDesks[this.deskIdx];
         } else if (LOCATIONS.engDesks && LOCATIONS.engDesks[this.deskIdx]) {
             this.desk = LOCATIONS.engDesks[this.deskIdx];
