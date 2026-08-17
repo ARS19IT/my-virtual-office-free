@@ -8,6 +8,7 @@ const HALF_TILE = TILE / 2;
 
 // --- DYNAMIC CANVAS SIZE (data-driven) ---
 const OFFICE_CONFIG_KEY = 'vo-product-office-config';
+const OFFICE_ROSTER_IDS = ['main', '2', 'team', 'dising', 'memory', 'worker', 'designer'];
 const COLOR_FAVORITES_KEY = 'vo-product-color-favorites';
 const MIN_TILES_X = 10;
 const MIN_TILES_Y = 10;
@@ -20,7 +21,15 @@ function loadOfficeConfig() {
     // Try localStorage first for immediate startup (sync)
     try {
         const saved = localStorage.getItem(OFFICE_CONFIG_KEY);
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+            var parsed = JSON.parse(saved);
+            if (Array.isArray(parsed.agents)) {
+                parsed.agents = parsed.agents.filter(function (agent) {
+                    return agent && OFFICE_ROSTER_IDS.indexOf(String(agent.id || agent.statusKey)) !== -1;
+                });
+            }
+            return parsed;
+        }
     } catch (e) {}
     return { canvasWidth: 1000, canvasHeight: 700 };
 }
