@@ -2422,7 +2422,7 @@ _CANONICAL_BRANCHES = [
 ]
 _CANONICAL_AGENT_BRANCHES = {
     "main": "CEO", "2": "MAIN_TEAM", "team": "MAIN_TEAM", "dising": "MAIN_TEAM",
-    "memory": "OPS_TEAM", "worker": "OPS_TEAM", "designer": "OPS_TEAM", "seo": "OPS_TEAM",
+    "memory": "OPS_TEAM", "worker": "OPS_TEAM", "designer": "OPS_TEAM",
 }
 _CANONICAL_AGENT_METADATA = {
     "main": {"name": "Кентик", "role": "Босс"},
@@ -2432,9 +2432,8 @@ _CANONICAL_AGENT_METADATA = {
     "memory": {"name": "Memory", "role": "Memory"},
     "worker": {"name": "Worker", "role": "Worker"},
     "designer": {"name": "Designer", "role": "Designer"},
-    "seo": {"name": "SEO", "role": "SEO"},
 }
-_CANONICAL_AGENT_ORDER = ["main", "2", "seo", "team", "dising", "memory", "worker", "designer"]
+_CANONICAL_AGENT_ORDER = ["main", "2", "team", "dising", "memory", "worker", "designer"]
 _LEGACY_BRANCH_IDS = {"BRANCH_1", "BRANCH_2", "CEO", "first", "second", "первая ветка", "вторая ветка"}
 
 
@@ -2461,33 +2460,19 @@ def _canonicalize_office_config(cfg, *, preserve_layout=True):
             # Keep the canonical office appearance stable across reloads. The
             # old live-roster fallback assigned gender randomly and persisted it.
             item["gender"] = "M"
-    # SEO is an office role even when no separate OpenClaw agent is configured.
-    # Keep it visible in the layout without letting live discovery add arbitrary
-    # characters or overwrite the saved appearance.
-    if "seo" not in by_key:
-        by_key["seo"] = {
-            "id": "seo", "name": "SEO", "role": "SEO", "emoji": "📈",
-            "color": "#00838f", "gender": "M", "branch": "OPS_TEAM",
-            "statusKey": "seo",
-            "appearance": {
-                "skinTone": "#d4a574", "hairStyle": "medium", "hairColor": "#333333",
-                "hairHighlight": None, "eyebrowStyle": "thick", "eyeColor": "#212121",
-                "facialHair": None, "facialHairColor": None, "headwear": None,
-                "headwearColor": None, "glasses": None, "glassesColor": None,
-                "costume": None, "heldItem": None, "deskItem": "chart"
-            }
-        }
     ordered = []
     seen = set()
     for item in cfg.get("agents") if isinstance(cfg.get("agents"), list) else []:
         key = str(item.get("statusKey") or item.get("id") or "") if isinstance(item, dict) else ""
-        if key in by_key and key not in seen:
+        if key in _CANONICAL_AGENT_ORDER and key in by_key and key not in seen:
             ordered.append(by_key[key])
             seen.add(key)
     for key in _CANONICAL_AGENT_ORDER:
         if key in by_key and key not in seen:
             ordered.append(by_key[key])
             seen.add(key)
+    # Drop stale role entries from persisted snapshots. The office roster is a
+    # fixed product contract; unconfigured characters must not reappear.
     cfg["agents"] = ordered
     return cfg
 

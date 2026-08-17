@@ -22,9 +22,9 @@ class OfficeConfigMigrationTests(unittest.TestCase):
         }
         migrated = server._canonicalize_office_config(cfg)
         self.assertEqual([b["id"] for b in migrated["branches"]], ["CEO", "MAIN_TEAM", "OPS_TEAM"])
-        self.assertEqual({a["id"]: a["branch"] for a in migrated["agents"]}, {"2": "MAIN_TEAM", "main": "CEO", "seo": "OPS_TEAM"})
-        self.assertEqual({a["id"]: a["name"] for a in migrated["agents"]}, {"2": "Сэм", "main": "Кентик", "seo": "SEO"})
-        self.assertEqual({a["id"]: a["role"] for a in migrated["agents"]}, {"2": "аналитик", "main": "Босс", "seo": "SEO"})
+        self.assertEqual({a["id"]: a["branch"] for a in migrated["agents"]}, {"2": "MAIN_TEAM", "main": "CEO"})
+        self.assertEqual({a["id"]: a["name"] for a in migrated["agents"]}, {"2": "Сэм", "main": "Кентик"})
+        self.assertEqual({a["id"]: a["role"] for a in migrated["agents"]}, {"2": "аналитик", "main": "Босс"})
         self.assertEqual(migrated["furniture"][0]["id"], "kept")
 
     def test_load_reads_persisted_layout_without_legacy_metadata(self):
@@ -40,7 +40,7 @@ class OfficeConfigMigrationTests(unittest.TestCase):
             self.assertNotIn("BRANCH_1", [b["id"] for b in loaded["branches"]])
 
     def test_canonical_roster_metadata_for_all_agents(self):
-        cfg = {"agents": [{"id": key} for key in ("main", "2", "team", "dising", "memory", "worker", "designer", "seo")]}
+        cfg = {"agents": [{"id": key} for key in ("main", "2", "team", "dising", "memory", "worker", "designer")]}
         migrated = server._canonicalize_office_config(cfg)
         actual = {a["id"]: (a["name"], a["role"], a["branch"]) for a in migrated["agents"]}
         self.assertEqual(actual, {
@@ -51,7 +51,6 @@ class OfficeConfigMigrationTests(unittest.TestCase):
             "memory": ("Memory", "Memory", "OPS_TEAM"),
             "worker": ("Worker", "Worker", "OPS_TEAM"),
             "designer": ("Designer", "Designer", "OPS_TEAM"),
-            "seo": ("SEO", "SEO", "OPS_TEAM"),
         })
 
     class _patch_status_dir:
