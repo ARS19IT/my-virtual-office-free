@@ -699,6 +699,33 @@
       }
     },
     {
+      "id": "seo",
+      "name": "SEO",
+      "role": "SEO",
+      "emoji": "📈",
+      "color": "#00838f",
+      "gender": "M",
+      "branch": "OPS_TEAM",
+      "statusKey": "seo",
+      "appearance": {
+        "skinTone": "#d4a574",
+        "hairStyle": "medium",
+        "hairColor": "#333333",
+        "hairHighlight": null,
+        "eyebrowStyle": "thick",
+        "eyeColor": "#212121",
+        "facialHair": null,
+        "facialHairColor": null,
+        "headwear": null,
+        "headwearColor": null,
+        "glasses": null,
+        "glassesColor": null,
+        "costume": null,
+        "heldItem": null,
+        "deskItem": "chart"
+      }
+    },
+    {
       "id": "team",
       "name": "Ден",
       "role": "разработчик",

@@ -2422,7 +2422,7 @@ _CANONICAL_BRANCHES = [
 ]
 _CANONICAL_AGENT_BRANCHES = {
     "main": "CEO", "2": "MAIN_TEAM", "team": "MAIN_TEAM", "dising": "MAIN_TEAM",
-    "memory": "OPS_TEAM", "worker": "OPS_TEAM", "designer": "OPS_TEAM",
+    "memory": "OPS_TEAM", "worker": "OPS_TEAM", "designer": "OPS_TEAM", "seo": "OPS_TEAM",
 }
 _CANONICAL_AGENT_METADATA = {
     "main": {"name": "Кентик", "role": "Босс"},
@@ -2432,7 +2432,9 @@ _CANONICAL_AGENT_METADATA = {
     "memory": {"name": "Memory", "role": "Memory"},
     "worker": {"name": "Worker", "role": "Worker"},
     "designer": {"name": "Designer", "role": "Designer"},
+    "seo": {"name": "SEO", "role": "SEO"},
 }
+_CANONICAL_AGENT_ORDER = ["main", "2", "seo", "team", "dising", "memory", "worker", "designer"]
 _LEGACY_BRANCH_IDS = {"BRANCH_1", "BRANCH_2", "CEO", "first", "second", "первая ветка", "вторая ветка"}
 
 
@@ -2456,7 +2458,37 @@ def _canonicalize_office_config(cfg, *, preserve_layout=True):
         if item is not None:
             item["branch"] = branch
             item.update(_CANONICAL_AGENT_METADATA[key])
-    cfg["agents"] = list(by_key.values()) if by_key else cfg.get("agents", [])
+            # Keep the canonical office appearance stable across reloads. The
+            # old live-roster fallback assigned gender randomly and persisted it.
+            item["gender"] = "M"
+    # SEO is an office role even when no separate OpenClaw agent is configured.
+    # Keep it visible in the layout without letting live discovery add arbitrary
+    # characters or overwrite the saved appearance.
+    if "seo" not in by_key:
+        by_key["seo"] = {
+            "id": "seo", "name": "SEO", "role": "SEO", "emoji": "📈",
+            "color": "#00838f", "gender": "M", "branch": "OPS_TEAM",
+            "statusKey": "seo",
+            "appearance": {
+                "skinTone": "#d4a574", "hairStyle": "medium", "hairColor": "#333333",
+                "hairHighlight": None, "eyebrowStyle": "thick", "eyeColor": "#212121",
+                "facialHair": None, "facialHairColor": None, "headwear": None,
+                "headwearColor": None, "glasses": None, "glassesColor": None,
+                "costume": None, "heldItem": None, "deskItem": "chart"
+            }
+        }
+    ordered = []
+    seen = set()
+    for item in cfg.get("agents") if isinstance(cfg.get("agents"), list) else []:
+        key = str(item.get("statusKey") or item.get("id") or "") if isinstance(item, dict) else ""
+        if key in by_key and key not in seen:
+            ordered.append(by_key[key])
+            seen.add(key)
+    for key in _CANONICAL_AGENT_ORDER:
+        if key in by_key and key not in seen:
+            ordered.append(by_key[key])
+            seen.add(key)
+    cfg["agents"] = ordered
     return cfg
 
 
@@ -3285,47 +3317,9 @@ def _patch_default_config_agents(config_str):
         cfg = json.loads(config_str)
     except Exception:
         return config_str
-    roster = get_roster()
-    if not roster:
-        return config_str
-    # Build agent entries from roster with random/seeded appearances
-    patched_agents = []
-    for a in roster:
-        agent_id = a.get("statusKey") or a.get("id", "main")
-        name = a.get("name") or agent_id
-        # Seed a deterministic hash for random appearance
-        h = int(hashlib.md5(agent_id.encode()).hexdigest(), 16)
-        skin_tones = ['#ffcc80','#d4a574','#c68642','#e8b88a','#fddcb5','#f5d0b0','#8d5524']
-        hair_styles = ['short','medium','long','curly','spiky','buzz','wavy']
-        hair_colors = ['#1a1a1a','#333333','#5d4037','#616161','#bf360c','#dcc282','#ffd700','#263238']
-        desk_items = ['trophy','envelope','calendar','chart','plans','checklist','files','ruler','money','marker']
-        gender = 'F' if (h >> 2) % 2 == 0 else 'M'
-        patched_agents.append({
-            "id": agent_id,
-            "name": _CANONICAL_AGENT_METADATA.get(agent_id, {}).get("name", name),
-            "role": _CANONICAL_AGENT_METADATA.get(agent_id, {}).get("role", a.get("role", "AI assistant")),
-            "emoji": a.get("emoji", "🤖"),
-            "color": _AGENT_COLORS_LIST[len(patched_agents) % len(_AGENT_COLORS_LIST)] if len(patched_agents) < len(_AGENT_COLORS_LIST) else '#607d8b',
-            "gender": gender,
-            "branch": _CANONICAL_AGENT_BRANCHES.get(agent_id, "UNASSIGNED"),
-            "statusKey": agent_id,
-            "appearance": {
-                "skinTone": skin_tones[h % len(skin_tones)],
-                "hairStyle": hair_styles[(h >> 3) % len(hair_styles)] if gender == 'M' else hair_styles[(h >> 3) % 3 + 2],
-                "hairColor": hair_colors[(h >> 5) % len(hair_colors)],
-                "hairHighlight": None,
-                "eyebrowStyle": "thin" if gender == 'F' else "thick",
-                "eyeColor": "#212121",
-                "facialHair": None, "facialHairColor": None,
-                "headwear": None, "headwearColor": None,
-                "glasses": None, "glassesColor": None,
-                "costume": None,
-                "heldItem": None,
-                "deskItem": desk_items[(h >> 8) % len(desk_items)]
-            }
-        })
-    cfg["agents"] = patched_agents
-    return json.dumps(cfg)
+    # The office layout is intentionally stable. Do not rebuild characters from
+    # the discovered runtime roster or randomize gender/appearance on reload.
+    return json.dumps(_canonicalize_office_config(cfg), ensure_ascii=False)
 
 # Color palette used for default config agent patching
 _AGENT_COLORS_LIST = ['#ffd700','#d32f2f','#1976d2','#388e3c','#f9a825','#e65100','#00897b','#7b1fa2','#6d4c41','#5c6bc0','#78909c','#4caf50','#00bcd4','#e91e90','#ff6d00','#795548','#607d8b','#9c27b0','#009688','#ff5722']
