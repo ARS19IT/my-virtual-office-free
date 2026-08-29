@@ -705,7 +705,7 @@
       "emoji": "🛠️",
       "color": "#1976d2",
       "gender": "M",
-      "branch": "MAIN_TEAM",
+      "branch": "OPS_TEAM",
       "statusKey": "team",
       "appearance": {
         "skinTone": "#f5d0b0",
@@ -759,7 +759,7 @@
       "emoji": "🧠",
       "color": "#6a1b9a",
       "gender": "M",
-      "branch": "OPS_TEAM",
+      "branch": "MAIN_TEAM",
       "statusKey": "memory",
       "appearance": {
         "skinTone": "#f5d0b0",
@@ -786,7 +786,7 @@
       "emoji": "🛠️",
       "color": "#00838f",
       "gender": "M",
-      "branch": "OPS_TEAM",
+      "branch": "MAIN_TEAM",
       "statusKey": "worker",
       "appearance": {
         "skinTone": "#c68642",

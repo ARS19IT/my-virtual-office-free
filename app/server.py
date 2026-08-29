@@ -2423,8 +2423,8 @@ _CANONICAL_BRANCHES = [
     {"id": "OPS_TEAM", "name": "Вторая ветка", "emoji": "⚙️", "theme": "branch-cyan"},
 ]
 _CANONICAL_AGENT_BRANCHES = {
-    "main": "CEO", "2": "MAIN_TEAM", "team": "MAIN_TEAM", "dising": "MAIN_TEAM",
-    "memory": "OPS_TEAM", "worker": "OPS_TEAM", "designer": "OPS_TEAM",
+    "main": "CEO", "2": "MAIN_TEAM", "memory": "MAIN_TEAM", "worker": "MAIN_TEAM", "dising": "MAIN_TEAM",
+    "team": "OPS_TEAM", "designer": "OPS_TEAM",
 }
 _CANONICAL_AGENT_METADATA = {
     "main": {"name": "Кентик", "role": "SEO"},

@@ -2200,10 +2200,10 @@ function _buildAgentDefs(apiAgents) {
     var canonical = {
         main: { name: 'Кентик', role: 'SEO', branch: 'CEO' },
         '2': { name: 'Сэм', role: 'SEO-аналитик', branch: 'MAIN_TEAM' },
-        team: { name: 'Ден', role: 'разработчик', branch: 'MAIN_TEAM' },
+        team: { name: 'Ден', role: 'разработчик', branch: 'OPS_TEAM' },
         dising: { name: 'Бухгалтер', role: 'бухгалтер', branch: 'MAIN_TEAM' },
-        memory: { name: 'Memory', role: 'Memory', branch: 'OPS_TEAM' },
-        worker: { name: 'Worker', role: 'Worker', branch: 'OPS_TEAM' },
+        memory: { name: 'Memory', role: 'Memory', branch: 'MAIN_TEAM' },
+        worker: { name: 'Worker', role: 'Worker', branch: 'MAIN_TEAM' },
         designer: { name: 'Designer', role: 'Designer', branch: 'OPS_TEAM' }
     };
     apiAgents.forEach(function(a, idx) {

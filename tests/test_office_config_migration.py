@@ -36,7 +36,7 @@ class OfficeConfigMigrationTests(unittest.TestCase):
                 loaded = server._load_office_config()
             self.assertEqual(loaded["canvasWidth"], 1234)
             self.assertEqual(loaded["furniture"][0]["id"], "user-desk")
-            self.assertEqual(loaded["agents"][0]["branch"], "MAIN_TEAM")
+            self.assertEqual(loaded["agents"][0]["branch"], "OPS_TEAM")
             self.assertNotIn("BRANCH_1", [b["id"] for b in loaded["branches"]])
 
     def test_canonical_roster_metadata_for_all_agents(self):
@@ -46,10 +46,10 @@ class OfficeConfigMigrationTests(unittest.TestCase):
         self.assertEqual(actual, {
             "main": ("Кентик", "SEO", "CEO"),
             "2": ("Сэм", "SEO-аналитик", "MAIN_TEAM"),
-            "team": ("Ден", "разработчик", "MAIN_TEAM"),
+            "team": ("Ден", "разработчик", "OPS_TEAM"),
             "dising": ("Бухгалтер", "бухгалтер", "MAIN_TEAM"),
-            "memory": ("Memory", "Memory", "OPS_TEAM"),
-            "worker": ("Worker", "Worker", "OPS_TEAM"),
+            "memory": ("Memory", "Memory", "MAIN_TEAM"),
+            "worker": ("Worker", "Worker", "MAIN_TEAM"),
             "designer": ("Designer", "Designer", "OPS_TEAM"),
         })
 
