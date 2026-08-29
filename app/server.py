@@ -13807,6 +13807,7 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
                     session_key = f"agent:{a['id']}:main"
                 # Prefer office-config name/emoji over IDENTITY.md
                 oc = _oc_overrides.get(a["statusKey"], {})
+                canonical = _CANONICAL_AGENT_METADATA.get(a["statusKey"], {})
                 # Resolve branch ID to display name
                 branch_id = oc.get("branch", "")
                 branch_name = _oc_branches.get(branch_id, "") if branch_id else ""
@@ -13820,8 +13821,8 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
                     "providerType": a.get("providerType", "runtime"),
                     "providerAgentId": a.get("providerAgentId", a["id"]),
                     "emoji": oc.get("emoji") or a["emoji"],
-                    "name": oc.get("name") or a["name"],
-                    "role": a.get("role", ""),
+                    "name": canonical.get("name") or oc.get("name") or a["name"],
+                    "role": canonical.get("role") or oc.get("role") or a.get("role", ""),
                     "model": a.get("model", ""),
                     "provider": a.get("provider", ""),
                     "lastActiveAt": a.get("lastActiveAt", 0),
