@@ -24,7 +24,7 @@ class OfficeConfigMigrationTests(unittest.TestCase):
         self.assertEqual([b["id"] for b in migrated["branches"]], ["CEO", "MAIN_TEAM", "OPS_TEAM"])
         self.assertEqual({a["id"]: a["branch"] for a in migrated["agents"]}, {"2": "MAIN_TEAM", "main": "CEO"})
         self.assertEqual({a["id"]: a["name"] for a in migrated["agents"]}, {"2": "Сэм", "main": "Кентик"})
-        self.assertEqual({a["id"]: a["role"] for a in migrated["agents"]}, {"2": "аналитик", "main": "Босс"})
+        self.assertEqual({a["id"]: a["role"] for a in migrated["agents"]}, {"2": "SEO-аналитик", "main": "SEO"})
         self.assertEqual(migrated["furniture"][0]["id"], "kept")
 
     def test_load_reads_persisted_layout_without_legacy_metadata(self):
@@ -44,8 +44,8 @@ class OfficeConfigMigrationTests(unittest.TestCase):
         migrated = server._canonicalize_office_config(cfg)
         actual = {a["id"]: (a["name"], a["role"], a["branch"]) for a in migrated["agents"]}
         self.assertEqual(actual, {
-            "main": ("Кентик", "Босс", "CEO"),
-            "2": ("Сэм", "аналитик", "MAIN_TEAM"),
+            "main": ("Кентик", "SEO", "CEO"),
+            "2": ("Сэм", "SEO-аналитик", "MAIN_TEAM"),
             "team": ("Ден", "разработчик", "MAIN_TEAM"),
             "dising": ("Бухгалтер", "бухгалтер", "MAIN_TEAM"),
             "memory": ("Memory", "Memory", "OPS_TEAM"),

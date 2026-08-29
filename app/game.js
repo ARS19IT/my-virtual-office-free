@@ -138,8 +138,8 @@ var H = _officeConfig.canvasHeight;
 
 const DEFAULT_BRANCHES = [
     { id: 'CEO', name: 'CEO', emoji: '🏢', theme: 'branch-orange' },
-    { id: 'MAIN_TEAM', name: 'Основная команда', emoji: '👥', theme: 'branch-blue' },
-    { id: 'OPS_TEAM', name: 'Операционная команда', emoji: '⚙️', theme: 'branch-cyan' }
+    { id: 'MAIN_TEAM', name: 'Первая ветка', emoji: '👥', theme: 'branch-blue' },
+    { id: 'OPS_TEAM', name: 'Вторая ветка', emoji: '⚙️', theme: 'branch-cyan' }
 ];
 const UNASSIGNED_BRANCH = { id: 'UNASSIGNED', name: 'Unassigned', emoji: '❓', theme: 'branch-gray' };
 
@@ -2198,8 +2198,8 @@ function _buildAgentDefs(apiAgents) {
 
     var defs = [];
     var canonical = {
-        main: { name: 'Кентик', role: 'Босс', branch: 'CEO' },
-        '2': { name: 'Сэм', role: 'аналитик', branch: 'MAIN_TEAM' },
+        main: { name: 'Кентик', role: 'SEO', branch: 'CEO' },
+        '2': { name: 'Сэм', role: 'SEO-аналитик', branch: 'MAIN_TEAM' },
         team: { name: 'Ден', role: 'разработчик', branch: 'MAIN_TEAM' },
         dising: { name: 'Бухгалтер', role: 'бухгалтер', branch: 'MAIN_TEAM' },
         memory: { name: 'Memory', role: 'Memory', branch: 'OPS_TEAM' },

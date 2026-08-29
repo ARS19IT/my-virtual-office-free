@@ -2419,16 +2419,16 @@ def _office_config_agent_override(agent_key):
 # branch").  Treat those as migration aliases, not as user-created groups.
 _CANONICAL_BRANCHES = [
     {"id": "CEO", "name": "CEO", "emoji": "🏢", "theme": "branch-orange"},
-    {"id": "MAIN_TEAM", "name": "Основная команда", "emoji": "👥", "theme": "branch-blue"},
-    {"id": "OPS_TEAM", "name": "Операционная команда", "emoji": "⚙️", "theme": "branch-cyan"},
+    {"id": "MAIN_TEAM", "name": "Первая ветка", "emoji": "👥", "theme": "branch-blue"},
+    {"id": "OPS_TEAM", "name": "Вторая ветка", "emoji": "⚙️", "theme": "branch-cyan"},
 ]
 _CANONICAL_AGENT_BRANCHES = {
     "main": "CEO", "2": "MAIN_TEAM", "team": "MAIN_TEAM", "dising": "MAIN_TEAM",
     "memory": "OPS_TEAM", "worker": "OPS_TEAM", "designer": "OPS_TEAM",
 }
 _CANONICAL_AGENT_METADATA = {
-    "main": {"name": "Кентик", "role": "Босс"},
-    "2": {"name": "Сэм", "role": "аналитик"},
+    "main": {"name": "Кентик", "role": "SEO"},
+    "2": {"name": "Сэм", "role": "SEO-аналитик"},
     "team": {"name": "Ден", "role": "разработчик"},
     "dising": {"name": "Бухгалтер", "role": "бухгалтер"},
     "memory": {"name": "Memory", "role": "Memory"},

@@ -630,14 +630,14 @@
     },
     {
       "id": "MAIN_TEAM",
-      "name": "Основная команда",
+      "name": "Первая ветка",
       "emoji": "👥",
       "theme": "branch-blue",
       "color": "#427bff"
     },
     {
       "id": "OPS_TEAM",
-      "name": "Операционная команда",
+      "name": "Вторая ветка",
       "emoji": "⚙️",
       "theme": "branch-cyan",
       "color": "#00a7b8"
@@ -647,7 +647,7 @@
     {
       "id": "main",
       "name": "Кентик",
-      "role": "Босс",
+      "role": "SEO",
       "emoji": "⚡",
       "color": "#ffd700",
       "gender": "M",
@@ -674,7 +674,7 @@
     {
       "id": "2",
       "name": "Сэм",
-      "role": "аналитик",
+      "role": "SEO-аналитик",
       "emoji": "🔎",
       "color": "#d32f2f",
       "gender": "M",
