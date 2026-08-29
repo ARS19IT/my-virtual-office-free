@@ -1445,10 +1445,11 @@ def _get_openclaw_native_fallback(reason="", agent_id=None):
         return {"ok": False, "error": str(e), "models": [], "authProfiles": [], "agents": {}}
     agents = {}
     for agent in cfg.get("agents", {}).get("list", []):
+        model = agent.get("model", "")
         agents[agent.get("id")] = {
             "id": agent.get("id"),
             "workspace": agent.get("workspace"),
-            "model": agent.get("model", ""),
+            "model": model.get("primary", "") if isinstance(model, dict) else model,
         }
     models = _read_openclaw_config_models(cfg)
     auth_profiles = _read_openclaw_auth_profiles(auth_agent_id)
@@ -1525,10 +1526,11 @@ def _get_openclaw_native_models(agent_id=None):
         local_providers = _openclaw_local_providers_from_config(cfg)
         cloud_providers = _openclaw_cloud_providers_from_config(cfg, auth_profiles)
         for agent in cfg.get("agents", {}).get("list", []):
+            model = agent.get("model", "")
             agents[agent.get("id")] = {
                 "id": agent.get("id"),
                 "workspace": agent.get("workspace"),
-                "model": agent.get("model", ""),
+                "model": model.get("primary", "") if isinstance(model, dict) else model,
             }
     except Exception:
         pass
