@@ -13779,11 +13779,12 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
             _oc_overrides = {}
             _oc_branches = {}
             try:
-                _oc_path = os.path.join(STATUS_DIR, "office-config.json")
-                with open(_oc_path, "r") as f:
-                    _oc_data = json.load(f)
+                # Use the same canonical office metadata as /api/agents. The
+                # raw persisted file can be stale and otherwise makes main
+                # inherit the identity name/role from another agent.
+                _oc_data = _load_office_config()
                 for _oc_agent in _oc_data.get("agents", []):
-                    _oc_id = _oc_agent.get("id", "")
+                    _oc_id = _oc_agent.get("statusKey") or _oc_agent.get("id", "")
                     if _oc_id:
                         _oc_overrides[_oc_id] = _oc_agent
                 # Build branch ID → display name map
