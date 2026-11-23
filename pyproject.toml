@@ -34,3 +34,6 @@ test = ["pytest>=8", "requests>=2"]
 
 [project.scripts]
 virtual-office-server = "server:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

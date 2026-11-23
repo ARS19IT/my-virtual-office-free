@@ -25,3 +25,4 @@ app/default-office-config.json.bak
 # Local screenshots and generated test artifacts
 free-office-live.png
 
+*.egg-info/
