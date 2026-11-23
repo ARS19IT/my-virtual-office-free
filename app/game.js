@@ -801,8 +801,7 @@ function pollWeather() {
         // No fallback — weather requires server-side config
         return null;
     }).then(function(res) {
-        if (!res) return null;
-        if (!res || !res.ok) return null;
+        if (!res || !res.ok || res.status === 204) return null;
         return res.json();
     }).then(function(data) {
         if (!data || !data.current_condition) return;

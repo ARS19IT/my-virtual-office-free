@@ -14645,9 +14645,11 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == "/weather-proxy":
             _wloc = VO_CONFIG["weather"].get("location")
             if not _wloc:
-                self.send_response(404)
+                # Weather is optional: 204 tells the client there is nothing to
+                # show without surfacing a console error on every page load.
+                self.send_response(204)
+                self.send_header("X-VO-Weather", "not-configured")
                 self.end_headers()
-                self.wfile.write(b'{"error":"Weather location not configured. Set weather.location in vo-config.json"}')
                 return
             try:
                 _wloc_encoded = urllib.parse.quote(_wloc, safe='')
