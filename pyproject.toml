@@ -15,7 +15,14 @@ package-dir = {"" = "app"}
 py-modules = [
   "server", "browser_control", "discovery", "gateway_presence",
   "layout_library", "license", "project_store", "accountant_report",
-  "token_optimizer"
+  "token_optimizer", "task_board_outbox"
+]
+
+[tool.setuptools.data-files]
+# The office UI; server.py finds it here when installed with pip.
+"share/my-virtual-office-free/app" = [
+  "app/*.html", "app/*.js", "app/*.css", "app/*.png", "app/*.svg",
+  "app/manifest.json", "app/default-office-config.json",
 ]
 
 [tool.setuptools.packages.find]

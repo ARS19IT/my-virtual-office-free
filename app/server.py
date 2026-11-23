@@ -13311,7 +13311,24 @@ def _auto_configure_gateway_origin():
         print(f"⚠️  Gateway auto-config failed: {e}")
 GATEWAY_HTTP = VO_CONFIG["openclaw"]["gatewayHttp"]
 CONFIG_PATH = os.path.join(WORKSPACE_BASE, "openclaw.json")
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
+def _resolve_app_dir():
+    """Folder with the office UI (index.html, game.js, default layout...).
+
+    A source checkout or Docker image keeps it next to server.py; a pip
+    install puts it under <prefix>/share/my-virtual-office-free/app.
+    """
+    candidates = [
+        os.environ.get("VO_APP_DIR", ""),
+        os.path.dirname(os.path.abspath(__file__)),
+        os.path.join(sys.prefix, "share", "my-virtual-office-free", "app"),
+    ]
+    for candidate in candidates:
+        if candidate and os.path.isfile(os.path.join(candidate, "index.html")):
+            return candidate
+    return candidates[1]
+
+
+APP_DIR = _resolve_app_dir()
 LAYOUT_LIBRARY = LayoutLibrary(STATUS_DIR, os.path.join(APP_DIR, "default-office-config.json"))
 
 
@@ -13738,7 +13755,7 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
         query_params = urllib.parse.parse_qs(parsed_url.query)
         # Setup wizard page
         if self.path == "/setup":
-            setup_path = os.path.join(os.path.dirname(__file__), "setup.html")
+            setup_path = os.path.join(APP_DIR, "setup.html")
             try:
                 with open(setup_path, "rb") as f:
                     content = f.read()
@@ -14507,7 +14524,7 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
                 )
                 if not meaningful:
                     # No saved config — serve bundled default with live agent roster
-                    _default_oc2 = os.path.join(os.path.dirname(__file__) or '.', 'default-office-config.json')
+                    _default_oc2 = os.path.join(APP_DIR, 'default-office-config.json')
                     try:
                         with open(_default_oc2, 'r') as df:
                             ddata = df.read()
@@ -14531,7 +14548,7 @@ class OfficeHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(data.encode())
             except FileNotFoundError:
                 # Try bundled default config with live agent roster
-                _default_oc = os.path.join(os.path.dirname(__file__) or '.', 'default-office-config.json')
+                _default_oc = os.path.join(APP_DIR, 'default-office-config.json')
                 try:
                     with open(_default_oc, 'r') as f:
                         data = f.read()
