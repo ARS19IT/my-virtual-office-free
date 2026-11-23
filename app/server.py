@@ -13745,9 +13745,41 @@ class ApiUsageCollector:
 _api_usage_collector = ApiUsageCollector(AUTH_PROFILES_PATH)
 
 
+_STATIC_SUFFIXES = {
+    ".html", ".js", ".css", ".png", ".svg", ".ico", ".jpg", ".jpeg", ".gif",
+    ".webp", ".woff", ".woff2", ".ttf",
+}
+_STATIC_JSON = {"manifest.json", "default-office-config.json"}
+
+
+def _is_public_static_path(url_path):
+    """True for office UI assets; False for source, scripts and configs.
+
+    APP_DIR also holds server.py, providers/, entrypoint.sh and possibly
+    vo-config.json with gateway tokens and API keys, and the server listens
+    on all interfaces, so static files are served from an allowlist.
+    """
+    path = urllib.parse.unquote(url_path or "/")
+    if path == "/":
+        return True
+    if path.endswith("/") or "\\" in path:
+        return False
+    segments = [s for s in path.split("/") if s]
+    if not segments or any(s.startswith(".") for s in segments):
+        return False
+    name = segments[-1]
+    return name in _STATIC_JSON or os.path.splitext(name)[1].lower() in _STATIC_SUFFIXES
+
+
 class OfficeHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=APP_DIR, **kwargs)
+
+    def send_head(self):
+        if not _is_public_static_path(urllib.parse.urlsplit(self.path).path):
+            self.send_error(404, "Not found")
+            return None
+        return super().send_head()
 
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
